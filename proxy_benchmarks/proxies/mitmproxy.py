@@ -7,6 +7,7 @@ Run as follows:
 from pathlib import Path
 from subprocess import Popen
 from time import sleep
+from contextlib import contextmanager
 
 from mitmproxy import ctx
 
@@ -27,6 +28,7 @@ addons = [Counter()]
 
 
 
+@contextmanager
 def launch_proxy(port=8080):
     current_extension_path = Path(__file__).resolve()
     process = Popen(f"poetry run mitmdump -s '{current_extension_path}' --listen-port {port}", shell=True)
@@ -36,4 +38,7 @@ def launch_proxy(port=8080):
         print("Waiting for proxy port launch...")
         sleep(1)
 
-    return process
+    try:
+        yield process
+    finally:
+        process.terminate()

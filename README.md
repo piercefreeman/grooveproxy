@@ -22,3 +22,13 @@ Will be installed as part of the benchmarking executable. Futher installation st
 1. Install https certificate for man-in-the-middle interception of https resources.
 
 Details: https://docs.mitmproxy.org/stable/concepts-certificates/
+
+# Requests
+
+## Playwright
+
+Install the browsers that we want to test through the proxy.
+
+```
+poetry run playwright install chromium
+```
