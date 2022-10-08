@@ -19,6 +19,8 @@ def capture_network_traffic(output_path: Path | str, interface: str = "en0"):
     """
     :param interface: BSD network interface name
 
+    https://knowledge.broadcom.com/external/article/171081/obtain-a-packet-capture-from-a-mac-compu.html
+
     """
     allowed_interfaces = list(net_if_addrs().keys())
     if interface not in allowed_interfaces:

@@ -9,13 +9,11 @@ The mark of a good web proxy, which routes from local -> proxy -> remote:
 Transparency in reconstructing requests:
 1. Maintain TLS Fingerprints from client. We use [ja3](https://github.com/salesforce/ja3) to check for fingerprint identity.
 
-```
-https://knowledge.broadcom.com/external/article/171081/obtain-a-packet-capture-from-a-mac-compu.html
-```
+Tested on OS X with Python 3.10.
 
-# Proxies
+## Proxies
 
-## mitmproxy
+### mitmproxy
 
 Will be installed as part of the benchmarking executable. Futher installation steps are required:
 
@@ -23,9 +21,9 @@ Will be installed as part of the benchmarking executable. Futher installation st
 
 Details: https://docs.mitmproxy.org/stable/concepts-certificates/
 
-# Requests
+## Requests
 
-## Playwright
+### Playwright
 
 Install the browsers that we want to test through the proxy.
 
