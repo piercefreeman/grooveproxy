@@ -11,11 +11,15 @@ from typing import Callable
 from proxy_benchmarks.fingerprinting import ja3_by_ip, Ja3Record
 from proxy_benchmarks.networking import capture_network_traffic
 from proxy_benchmarks.proxies.mitmproxy import launch_proxy
-from proxy_benchmarks.requests import ChromeRequestHeadfull
+from proxy_benchmarks.requests import ChromeRequest, PythonRequest
 from functools import partial
+from rich.console import Console
 
 # To test TCP connection, we need a valid https url
 TEST_TCP_URL = "https://freeman.vc"
+
+console = Console()
+
 
 def get_fingerprint(url: str, request_fn: Callable[[str], None]) -> dict[str, list[Ja3Record]]:
     with TemporaryDirectory() as directory:
@@ -37,30 +41,51 @@ def get_fingerprint(url: str, request_fn: Callable[[str], None]) -> dict[str, li
 
     return network_records[search_ip]
 
+
 @command()
 def main():
     # Ensure we have sudo permissions
     print("proxy-benchmarks needs to capture network traffic...")
     run(f"sudo echo 'Confirmation success...\n'", shell=True)
 
+    runners = [
+        PythonRequest(),
+        ChromeRequest(headless=True),
+        ChromeRequest(headless=False),
+    ]
+
     with launch_proxy():
-        chrome_runner = ChromeRequestHeadfull()
+        print("Launched proxy...")
 
-        fingerprints = get_fingerprint(
-            TEST_TCP_URL,
-            request_fn=partial(
-                chrome_runner.handle_request,
-                proxy="http://localhost:8080",
-            )
-        )
+        for runner in runners:
+            fingerprint_by_proxy = {}
 
-        # If multiple fingerprints came back for the domain (because of multiple outbound requests on different
-        # TCP connections), ensure these are all the same. We expect the same request type
-        # will have the same fingerprint over time so this is mostly a sanity check.
-        fingerprint_digests = {record.digest for record in fingerprints}
-        if len(fingerprint_digests) > 1:
-            raise ValueError(f"Fingerprint values are not consistent across requests: `{fingerprint_digests}`.")
+            for proxy in ["http://localhost:8080", None]:
+                divider = "-" * console.width
+                console.print(f"{divider}\nTesting {runner} with proxy {proxy}\n{divider}", style="bold blue")
 
-        print(fingerprint_digests)
+                fingerprints = get_fingerprint(
+                    TEST_TCP_URL,
+                    request_fn=partial(
+                        runner.handle_request,
+                        proxy=proxy,
+                    )
+                )
+
+                # If multiple fingerprints came back for the domain (because of multiple outbound requests on different
+                # TCP connections), ensure these are all the same. We expect the same request type
+                # will have the same fingerprint over time so this is mostly a sanity check.
+                fingerprint_digests = {record.digest for record in fingerprints}
+                if len(fingerprint_digests) > 1:
+                    console.print(f"Fingerprint values are not consistent across requests: `{fingerprint_digests}`.", style="bold red")
+                    pass
+
+                console.print(f"Results {runner} {proxy}: fingerprint_digests")
+                fingerprint_by_proxy[proxy] = fingerprint_digests
+
+            # Ensure the fingerprints are the same for the same request type, regardless of proxy
+            fingerprint_values = {frozenset(digests) for digests in fingerprint_by_proxy.values()}
+            if len(fingerprint_values) > 1:
+                console.print(f"Fingerprint values are not consistent across proxies: `{fingerprint_values}`.", style="bold red")
 
         sleep(5)

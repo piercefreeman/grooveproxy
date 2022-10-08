@@ -38,6 +38,8 @@ def launch_proxy(port=8080):
         print("Waiting for proxy port launch...")
         sleep(1)
 
+    sleep(1)
+
     try:
         yield process
     finally:
