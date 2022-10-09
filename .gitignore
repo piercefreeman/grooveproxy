@@ -4,3 +4,5 @@ node_modules
 
 # Certificate cache
 .http-mitm-proxy
+ca.crt
+ca.key

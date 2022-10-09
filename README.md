@@ -45,6 +45,16 @@ Install and trust the root certificate which is used to create synthetic certifi
 cd proxy_benchmarks/assets/node_http_proxy && npm run setup
 ```
 
+### gomitmproxy
+
+Install the executable dependencies and setup the ssh credentials.
+
+```
+cd proxy_benchmarks/assets/gomitmproxy
+go install
+./setup.sh
+```
+
 ## Requests
 
 ### Playwright

@@ -1,15 +1,16 @@
 from abc import ABC, abstractmethod
+
 from playwright.sync_api import sync_playwright
 from requests import get
 
 
-class BaseRequest(ABC):
+class RequestBase(ABC):
     @abstractmethod
     def handle_request(self, url: str, proxy: str | None):
         pass
 
 
-class PythonRequest(BaseRequest):
+class PythonRequest(RequestBase):
     def handle_request(self, url: str, proxy: str | None):
         response = get(
             url,
@@ -25,7 +26,7 @@ class PythonRequest(BaseRequest):
         return "PythonRequest()"
 
 
-class ChromeRequest(BaseRequest):
+class ChromeRequest(RequestBase):
     def __init__(self, headless):
         self.headless = headless
 
