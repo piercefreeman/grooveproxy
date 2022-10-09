@@ -10,7 +10,8 @@ from typing import Callable
 
 from proxy_benchmarks.fingerprinting import ja3_by_ip, Ja3Record
 from proxy_benchmarks.networking import capture_network_traffic
-from proxy_benchmarks.proxies.mitmproxy import launch_proxy
+#from proxy_benchmarks.proxies.mitmproxy import launch_proxy
+from proxy_benchmarks.proxies.node_http_proxy import launch_proxy
 from proxy_benchmarks.requests import ChromeRequest, PythonRequest
 from functools import partial
 from rich.console import Console

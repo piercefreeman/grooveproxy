@@ -35,5 +35,7 @@ def capture_network_traffic(output_path: Path | str, interface: str = "en0"):
     run(f"sudo kill {process.pid}", shell=True)
 
     outputs, errors = process.communicate()
-    print(outputs.decode())
-    print(errors.decode())
+    # Additional logging content is written to stderr, so we don't needlessly flag an error here
+    for output in [outputs.decode(), errors.decode()]:
+        if output.strip():
+            print("Network Outputs", output)
