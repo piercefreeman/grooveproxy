@@ -4,14 +4,15 @@ Basic skeleton of a mitmproxy addon.
 Run as follows: 
 
 """
+from contextlib import contextmanager
 from pathlib import Path
 from subprocess import Popen
 from time import sleep
-from contextlib import contextmanager
 
 from mitmproxy import ctx
 
 from proxy_benchmarks.networking import is_socket_bound
+from proxy_benchmarks.proxies.base import ProxyBase
 
 
 class Counter:
@@ -27,20 +28,23 @@ class Counter:
 addons = [Counter()]
 
 
+class MitmProxy(ProxyBase):
+    @contextmanager
+    def launch(self):
+        current_extension_path = Path(__file__).resolve()
+        process = Popen(f"poetry run mitmdump -s '{current_extension_path}' --listen-port {port}", shell=True)
 
-@contextmanager
-def launch_proxy(port=8080):
-    current_extension_path = Path(__file__).resolve()
-    process = Popen(f"poetry run mitmdump -s '{current_extension_path}' --listen-port {port}", shell=True)
+        # Wait for the proxy to spin up
+        while not is_socket_bound("localhost", self.port):
+            print("Waiting for proxy port launch...")
+            sleep(1)
 
-    # Wait for the proxy to spin up
-    while not is_socket_bound("localhost", port):
-        print("Waiting for proxy port launch...")
         sleep(1)
 
-    sleep(1)
+        try:
+            yield process
+        finally:
+            process.terminate()
 
-    try:
-        yield process
-    finally:
-        process.terminate()
+    def __repr__(self) -> str:
+        return f"MitmProxy(port={self.port})"
