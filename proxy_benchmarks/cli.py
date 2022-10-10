@@ -17,6 +17,7 @@ from proxy_benchmarks.proxies.gomitmproxy import GoMitmProxy
 from proxy_benchmarks.proxies.martian import MartianProxy
 from proxy_benchmarks.proxies.mitmproxy import MitmProxy
 from proxy_benchmarks.proxies.node_http_proxy import NodeHttpProxy
+from proxy_benchmarks.proxies.goproxy import GoProxy
 from proxy_benchmarks.requests import ChromeRequest, PythonRequest, RequestBase
 
 # To test TCP connection, we need a valid https url
@@ -56,7 +57,8 @@ def main():
         #MitmProxy(),
         #NodeHttpProxy(),
         #GoMitmProxy(),
-        MartianProxy(),
+        #MartianProxy(),
+        GoProxy(),
     ]
 
     runners: list[RequestBase] = [
