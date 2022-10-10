@@ -27,9 +27,7 @@ Our proxies need additional setup when running locally.
 
 ### mitmproxy
 
-Install https certificate for man-in-the-middle interception of https resources.
-
-Details: https://docs.mitmproxy.org/stable/concepts-certificates/
+`mitmproxy` will automatically create a root certificate to authorize requests. To then trust this certificate locally, follow the instructions here: https://docs.mitmproxy.org/stable/concepts-certificates/
 
 ### node-http-proxy
 
@@ -51,6 +49,16 @@ Install the executable dependencies and setup the ssh credentials.
 
 ```
 cd proxy_benchmarks/assets/gomitmproxy
+go install
+./setup.sh
+```
+
+### martian
+
+Install the executable dependencies and setup the ssh credentials.
+
+```
+cd proxy_benchmarks/assets/martian
 go install
 ./setup.sh
 ```
