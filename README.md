@@ -23,45 +23,15 @@ Tested on OS X with Python 3.10.
 
 ## Proxies
 
-Our proxies need additional setup when running locally.
+Our proxies need additional setup when running locally. For convenience we have a setup script that handles this across all proxies. This script will install the necessary dependencies across node, go, and python to power the necessary proxies. It will also generate root certificates for the MITM proxy handlers. Expect to see multiple popups to trust these credentials.
+
+```
+./setup.sh
+```
 
 ### mitmproxy
 
 `mitmproxy` will automatically create a root certificate to authorize requests. To then trust this certificate locally, follow the instructions here: https://docs.mitmproxy.org/stable/concepts-certificates/
-
-### node-http-proxy
-
-First, install the node requirements.
-
-```
-cd proxy_benchmarks/assets/node_http_proxy && npm install
-```
-
-Install and trust the root certificate which is used to create synthetic certificates for each new host conducted in the test.
-
-```
-cd proxy_benchmarks/assets/node_http_proxy && npm run setup
-```
-
-### gomitmproxy
-
-Install the executable dependencies and setup the ssh credentials.
-
-```
-cd proxy_benchmarks/assets/gomitmproxy
-go install
-./setup.sh
-```
-
-### martian
-
-Install the executable dependencies and setup the ssh credentials.
-
-```
-cd proxy_benchmarks/assets/martian
-go install
-./setup.sh
-```
 
 ## Requests
 

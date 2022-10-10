@@ -6,3 +6,5 @@ node_modules
 .http-mitm-proxy
 ca.crt
 ca.key
+cert.crt
+cert.key
