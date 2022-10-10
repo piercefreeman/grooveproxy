@@ -14,10 +14,10 @@ from proxy_benchmarks.fingerprinting import Ja3Record, ja3_by_ip
 from proxy_benchmarks.networking import capture_network_traffic
 from proxy_benchmarks.proxies.base import ProxyBase
 from proxy_benchmarks.proxies.gomitmproxy import GoMitmProxy
+from proxy_benchmarks.proxies.goproxy import GoProxy
 from proxy_benchmarks.proxies.martian import MartianProxy
 from proxy_benchmarks.proxies.mitmproxy import MitmProxy
 from proxy_benchmarks.proxies.node_http_proxy import NodeHttpProxy
-from proxy_benchmarks.proxies.goproxy import GoProxy
 from proxy_benchmarks.requests import ChromeRequest, PythonRequest, RequestBase
 
 # To test TCP connection, we need a valid https url
@@ -54,16 +54,16 @@ def main():
     run(f"sudo echo 'Confirmation success...\n'", shell=True)
 
     proxies: list[ProxyBase] = [
-        #MitmProxy(),
-        #NodeHttpProxy(),
-        #GoMitmProxy(),
-        #MartianProxy(),
+        MitmProxy(),
+        NodeHttpProxy(),
+        GoMitmProxy(),
+        MartianProxy(),
         GoProxy(),
     ]
 
     runners: list[RequestBase] = [
         PythonRequest(),
-        #ChromeRequest(headless=True),
+        ChromeRequest(headless=True),
         ChromeRequest(headless=False),
     ]
 
