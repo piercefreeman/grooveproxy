@@ -14,6 +14,7 @@ from proxy_benchmarks.fingerprinting import Ja3Record, ja3_by_ip
 from proxy_benchmarks.networking import capture_network_traffic
 from proxy_benchmarks.proxies.base import ProxyBase
 from proxy_benchmarks.proxies.gomitmproxy import GoMitmProxy
+from proxy_benchmarks.proxies.martian import MartianProxy
 from proxy_benchmarks.proxies.mitmproxy import MitmProxy
 from proxy_benchmarks.proxies.node_http_proxy import NodeHttpProxy
 from proxy_benchmarks.requests import ChromeRequest, PythonRequest, RequestBase
@@ -54,7 +55,8 @@ def main():
     proxies: list[ProxyBase] = [
         #MitmProxy(),
         #NodeHttpProxy(),
-        GoMitmProxy(),
+        #GoMitmProxy(),
+        MartianProxy(),
     ]
 
     runners: list[RequestBase] = [
@@ -75,7 +77,7 @@ def main():
                 # Compare fingerprint signatures with and without proxy
                 for proxy_url in [f"http://localhost:{proxy.port}", None]:
                     divider = "-" * console.width
-                    console.print(f"{divider}\nTesting {runner} with proxy {proxy}\n{divider}", style="bold blue")
+                    console.print(f"{divider}\nTesting {runner} with proxy {proxy} ({proxy_url})\n{divider}", style="bold blue")
 
                     fingerprints = get_fingerprint(
                         TEST_TCP_URL,
@@ -94,11 +96,11 @@ def main():
                         pass
 
                     console.print(f"Results {runner} {proxy} ({proxy_url}): {fingerprint_digests}")
-                    fingerprint_by_proxy[proxy] = fingerprint_digests
+                    fingerprint_by_proxy[proxy_url] = fingerprint_digests
 
                 # Ensure the fingerprints are the same for the same request type, regardless of proxy
                 fingerprint_values = {frozenset(digests) for digests in fingerprint_by_proxy.values()}
                 if len(fingerprint_values) > 1:
-                    console.print(f"Fingerprint values are not consistent across proxies:", style="bold red")
-                    for proxy, digests in fingerprint_by_proxy.items():
-                        console.print(f"  {proxy}: {digests}")
+                    console.print(f"\nFingerprint values are not consistent across proxies:", style="bold red")
+                    for proxy_url, digests in fingerprint_by_proxy.items():
+                        console.print(f"  {proxy} {proxy_url}: {digests}")
