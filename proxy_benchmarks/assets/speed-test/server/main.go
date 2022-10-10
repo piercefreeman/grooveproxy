@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -18,6 +19,8 @@ func main() {
 
 	http.HandleFunc("/handle", func(w http.ResponseWriter, r *http.Request) {
 		id := uuid.New()
+
+		time.Sleep(1 * time.Second)
 
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("Request handled.\nValue:" + id.String()))

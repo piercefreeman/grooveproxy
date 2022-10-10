@@ -11,7 +11,7 @@ openssl req \
     -keyout cert.key \
     -new \
     -out cert.crt \
-    -subj /CN=Hostname \
+    -subj /CN=SpeedTestServer \
     -reqexts SAN \
     -extensions SAN \
     -config openssl_config.conf \

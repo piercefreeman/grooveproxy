@@ -8,3 +8,6 @@ ca.crt
 ca.key
 cert.crt
 cert.key
+
+# Load test
+**/data/*.csv

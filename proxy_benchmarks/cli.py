@@ -7,7 +7,7 @@ from time import sleep
 from typing import Callable
 from urllib.parse import urlparse
 
-from click import command
+from click import group
 from rich.console import Console
 
 from proxy_benchmarks.fingerprinting import Ja3Record, ja3_by_ip
@@ -19,6 +19,8 @@ from proxy_benchmarks.proxies.martian import MartianProxy
 from proxy_benchmarks.proxies.mitmproxy import MitmProxy
 from proxy_benchmarks.proxies.node_http_proxy import NodeHttpProxy
 from proxy_benchmarks.requests import ChromeRequest, PythonRequest, RequestBase
+from subprocess import Popen
+from proxy_benchmarks.assets import get_asset_path
 
 # To test TCP connection, we need a valid https url
 TEST_TCP_URL = "https://freeman.vc"
@@ -47,8 +49,12 @@ def get_fingerprint(url: str, request_fn: Callable[[str], None]) -> dict[str, li
     return network_records[search_ip]
 
 
-@command()
+@group()
 def main():
+    pass
+
+@main.command()
+def fingerprint(self):
     # Ensure we have sudo permissions
     print("proxy-benchmarks needs to capture network traffic...")
     run(f"sudo echo 'Confirmation success...\n'", shell=True)
@@ -106,3 +112,30 @@ def main():
                     console.print(f"\nFingerprint values are not consistent across proxies:", style="bold red")
                     for proxy_url, digests in fingerprint_by_proxy.items():
                         console.print(f"  {proxy} {proxy_url}: {digests}")
+
+
+@main.command()
+def load_test_baseline():
+    try:
+        server_process = Popen("go run .", shell=True, cwd=get_asset_path("speed-test/server"))
+
+        spawn_processes = 5
+        run_time = "1m"
+
+        # Launch the coordination server
+        # This will wait to launch until N processes have connected
+        main_process = Popen(f"poetry run locust --run-time {run_time} --master --expect-workers {spawn_processes} --config=no_proxy_load_locust.conf", shell=True, cwd=get_asset_path("speed-test/locust"))
+
+        worker_processes = [
+            Popen("poetry run locust --worker --config=no_proxy_load_locust.conf", shell=True, cwd=get_asset_path("speed-test/locust"))
+            for _ in range(spawn_processes)
+        ]
+
+        print("Will load...")
+
+        main_process.wait()
+    finally:
+        server_process.terminate()
+        main_process.terminate()
+        for process in worker_processes:
+            process.terminate()

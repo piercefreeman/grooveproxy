@@ -32,7 +32,7 @@ class MitmProxy(ProxyBase):
     @contextmanager
     def launch(self):
         current_extension_path = Path(__file__).resolve()
-        process = Popen(f"poetry run mitmdump -s '{current_extension_path}' --listen-port {port}", shell=True)
+        process = Popen(f"poetry run mitmdump -s '{current_extension_path}' --listen-port {self.port}", shell=True)
 
         # Wait for the proxy to spin up
         while not is_socket_bound("localhost", self.port):

@@ -10,7 +10,7 @@ from proxy_benchmarks.proxies.base import ProxyBase
 class NodeHttpProxy(ProxyBase):
     @contextmanager
     def launch(self):
-        current_extension_path = get_asset_path("node_http_proxy")
+        current_extension_path = get_asset_path("proxies/node_http_proxy")
         process = Popen(f"npm run main --port {self.port}", shell=True, cwd=current_extension_path)
 
         # Wait for the proxy to spin up

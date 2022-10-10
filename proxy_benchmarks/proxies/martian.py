@@ -13,7 +13,7 @@ from proxy_benchmarks.proxies.base import ProxyBase
 class MartianProxy(ProxyBase):
     @contextmanager
     def launch(self):
-        current_extension_path = get_asset_path("martian")
+        current_extension_path = get_asset_path("proxies/martian")
         process = Popen(f"go run . --port {self.port}", shell=True, cwd=current_extension_path)
 
         # Wait for the proxy to spin up
