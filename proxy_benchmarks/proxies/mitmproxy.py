@@ -12,7 +12,9 @@ from time import sleep
 from mitmproxy import ctx
 
 from proxy_benchmarks.networking import is_socket_bound
-from proxy_benchmarks.proxies.base import ProxyBase
+from proxy_benchmarks.proxies.base import ProxyBase, CertificateAuthority
+from proxy_benchmarks.process import terminate_all
+from proxy_benchmarks.assets import get_asset_path
 
 
 class Counter:
@@ -32,19 +34,31 @@ class MitmProxy(ProxyBase):
     @contextmanager
     def launch(self):
         current_extension_path = Path(__file__).resolve()
-        process = Popen(f"poetry run mitmdump -s '{current_extension_path}' --listen-port {self.port}", shell=True)
+        certificate_directory = get_asset_path("proxies/mitmproxy")
 
-        # Wait for the proxy to spin up
-        while not is_socket_bound("localhost", self.port):
-            print("Waiting for proxy port launch...")
-            sleep(1)
+        process = Popen(
+            f"poetry run mitmdump -s '{current_extension_path}' --listen-port {self.port} --set confdir={certificate_directory} --ssl-insecure",
+            shell=True,
+        )
 
+        self.wait_for_launch()
         sleep(1)
 
         try:
             yield process
         finally:
-            process.terminate()
+            terminate_all(process)
+
+            # Remove certificates from launch so we can explicitly test new credential generation
+
+            self.wait_for_close()
+
+    @property
+    def certificate_authority(self) -> CertificateAuthority:
+        return CertificateAuthority(
+            public=get_asset_path("proxies/mitmproxy/mitmproxy-ca.crt"),
+            key=get_asset_path("proxies/mitmproxy/mitmproxy-ca.key"),
+        )
 
     @property
     def short_name(self) -> str:

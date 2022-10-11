@@ -8,6 +8,8 @@ ca.crt
 ca.key
 cert.crt
 cert.key
+mitmproxy-ca.crt
+mitmproxy-ca.key
 
 # Load test
 **/data/*.csv

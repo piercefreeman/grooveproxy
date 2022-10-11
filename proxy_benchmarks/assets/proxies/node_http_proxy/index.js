@@ -2,6 +2,10 @@ const Proxy = require('@bjowes/http-mitm-proxy');
 const { program } = require('commander');
 const chalk = require('chalk');
 
+// Allow self-signed certificates during fetch, since the local harness launches
+// a web service that generates its own self-signed certificates.
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
 program
   .option('--port')
 

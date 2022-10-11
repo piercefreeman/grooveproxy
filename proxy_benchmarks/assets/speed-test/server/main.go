@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/tls"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -14,8 +15,11 @@ import (
 )
 
 func main() {
-	port := 3010
-	tlsPort := 3011
+	var (
+		port    = flag.Int("port", 3010, "http port to listen on")
+		tlsPort = flag.Int("tls-port", 3011, "tls port to listen on")
+	)
+	flag.Parse()
 
 	http.HandleFunc("/handle", func(w http.ResponseWriter, r *http.Request) {
 		id := uuid.New()
@@ -26,10 +30,10 @@ func main() {
 		w.Write([]byte("Request handled.\nValue:" + id.String()))
 	})
 
-	fmt.Printf("Will launch server on port %d and tls on %d\n", port, tlsPort)
+	fmt.Printf("Will launch speed test server on port %d and tls on %d\n", *port, *tlsPort)
 
 	go func() {
-		err := http.ListenAndServe(":"+strconv.Itoa(port), nil)
+		err := http.ListenAndServe(":"+strconv.Itoa(*port), nil)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -41,7 +45,7 @@ func main() {
 
 		// create a custom server with `TLSConfig`
 		s := &http.Server{
-			Addr:    ":" + strconv.Itoa(tlsPort),
+			Addr:    ":" + strconv.Itoa(*tlsPort),
 			Handler: nil, // use `http.DefaultServeMux`
 			TLSConfig: &tls.Config{
 				Certificates: []tls.Certificate{cert},

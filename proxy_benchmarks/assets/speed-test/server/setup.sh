@@ -1,6 +1,6 @@
 # Create a custom openssl config that sets the subject of the certificate to localhost
 cat /etc/ssl/openssl.cnf > openssl_config.conf
-echo '\n[SAN]\nsubjectAltName=DNS:localhost,IP:127.0.0.1' >> openssl_config.conf
+echo '\n[SAN]\nsubjectAltName=DNS:localhost,IP:127.0.0.1,IP:127.0.0.2' >> openssl_config.conf
 
 # https://serverfault.com/questions/880804/can-not-get-rid-of-neterr-cert-common-name-invalid-error-in-chrome-with-self
 openssl genrsa -out cert.key 2048

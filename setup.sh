@@ -2,6 +2,9 @@
 # Global setup script for the project
 #
 
+# mitmproxy
+(cd proxy_benchmarks/assets/mitmproxy && ./setup.sh)
+
 # node_http_proxy
 (cd proxy_benchmarks/assets/node_http_proxy && npm install && npm run setup)
 

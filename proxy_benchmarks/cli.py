@@ -16,8 +16,8 @@ from click import group, option
 from rich.console import Console
 
 from proxy_benchmarks.fingerprinting import Ja3Record, ja3_by_ip
-from proxy_benchmarks.load_test import LoadTestResults, run_load_test
-from proxy_benchmarks.networking import capture_network_traffic
+from proxy_benchmarks.load_test import LoadTestResults, run_load_test, run_load_server
+from proxy_benchmarks.networking import capture_network_traffic, SyntheticHosts, SyntheticHostDefinition
 from proxy_benchmarks.proxies.base import ProxyBase
 from proxy_benchmarks.proxies.gomitmproxy import GoMitmProxy
 from proxy_benchmarks.proxies.goproxy import GoProxy
@@ -25,6 +25,11 @@ from proxy_benchmarks.proxies.martian import MartianProxy
 from proxy_benchmarks.proxies.mitmproxy import MitmProxy
 from proxy_benchmarks.proxies.node_http_proxy import NodeHttpProxy
 from proxy_benchmarks.requests import ChromeRequest, PythonRequest, RequestBase
+#from warnings import filterwarnings
+
+# We expect that ssl errors will occur because of our self-signed certificates
+# Don't pollute the output with this class of warnings
+#filterwarnings("ignore", message="Unverified HTTPS request")
 
 # To test TCP connection, we need a valid https url
 TEST_TCP_URL = "https://freeman.vc"
@@ -153,38 +158,73 @@ def load_test():
 
 @load_test.command()
 @option("--data-path", type=ClickPath(dir_okay=True, file_okay=False), required=True)
-def execute(data_path):
+@option("--runtime-seconds", type=int, default=60)
+def execute(data_path, runtime_seconds):
     output_path = Path(data_path).expanduser()
     output_path.mkdir(exist_ok=True)
 
     divider = "-" * console.width
 
-    console.print(f"{divider}\nWill perform baseline load test...\n{divider}", style="bold blue")
-    http_baseline_results = run_load_test("http_baseline_locust.conf", run_time_seconds=10)
-    https_baseline_results = run_load_test("https_baseline_locust.conf", run_time_seconds=10)
-    console.print("Baseline test completed...")
+    with run_load_server() as load_server_definition:
+        # Launch a synthetic host for our fake server because some MITM implementations
+        # (specifically [gomitmproxy](https://github.com/AdguardTeam/gomitmproxy/blob/c7fb1711772b738d3f89b55615b6ac0c8e312367/proxy.go#L661)
+        # but there might be others) require a tls connection on port 443.
+        synthetic_ip_addresses = SyntheticHosts(
+            [
+                SyntheticHostDefinition(
+                    name="load-server",
+                    http_port=load_server_definition["http"],
+                    https_port=load_server_definition["https"],
+                )
+            ]
+        ).configure()
+        synthetic_ip_address = next(iter(synthetic_ip_addresses.values()))
 
-    finalize_results(output_path, "baseline", http_baseline_results, https_baseline_results)
+        console.print(f"{divider}\nWill perform baseline load test...\n{divider}", style="bold blue")
+        http_baseline_results = run_load_test(f"http://{synthetic_ip_address}", "http_baseline_locust.conf", run_time_seconds=runtime_seconds)
+        https_baseline_results = run_load_test(f"https://{synthetic_ip_address}", "https_baseline_locust.conf", run_time_seconds=runtime_seconds)
+        console.print("Baseline test completed...")
 
-    proxies: list[ProxyBase] = [
-        MitmProxy(),
-        #NodeHttpProxy(),
-        #GoMitmProxy(),
-        #MartianProxy(),
-        #GoProxy(),
-    ]
+        finalize_results(output_path, "baseline", http_baseline_results, https_baseline_results)
 
-    for proxy in proxies:
-        console.print(f"{divider}\nWill perform http load test with {proxy}...\n{divider}", style="bold blue")
+        proxies: list[ProxyBase] = [
+            MitmProxy(),
+            NodeHttpProxy(),
+            GoMitmProxy(),
+            MartianProxy(),
+            GoProxy(),
+        ]
 
-        with proxy.launch():
-            run_load_test(f"http_locust.conf", proxy_port=proxy.port, run_time_seconds=10)
-            run_load_test(f"https_locust.conf", proxy_port=proxy.port, run_time_seconds=10)
+        for proxy in proxies:
+            with proxy.launch():
+                console.print(f"{divider}\nWill perform http load test with {proxy}...\n{divider}", style="bold blue")
+                http_baseline_results = run_load_test(f"http://{synthetic_ip_address}", f"http_locust.conf", proxy=proxy, run_time_seconds=runtime_seconds)
 
-            # Move somewhere permanent since these will be overridden
-            finalize_results(output_path, proxy.short_name, http_baseline_results, https_baseline_results)
+                console.print(f"{divider}\nWill perform https load test with {proxy}...\n{divider}", style="bold blue")
+                https_baseline_results = run_load_test(f"https://{synthetic_ip_address}", f"https_locust.conf", proxy=proxy, run_time_seconds=runtime_seconds)
 
-        console.print(f"Load test with {proxy} completed...")
+                # from requests import get
+                # from time import sleep
+                # proxies = {
+                #     "http": f"http://localhost:{proxy.port}",
+                #     "https": f"http://localhost:{proxy.port}",
+                # }
+                # response = get(
+                #     f"https://{synthetic_ip_address}/handler",
+                #     proxies=proxies,
+                #     verify=False,
+                #     cert=(
+                #         str(proxy.certificate_authority.public),
+                #         str(proxy.certificate_authority.key),
+                #     )
+                # )
+                # print(response)
+                # sleep(20)
+
+                # Move somewhere permanent since these will be overridden
+                finalize_results(output_path, proxy.short_name, http_baseline_results, https_baseline_results)
+
+            console.print(f"Load test with {proxy} completed...")
 
 
 @load_test.command()
@@ -193,25 +233,31 @@ def analyze(data_path):
     data_path = Path(data_path).expanduser()
 
     proxies: list[ProxyBase] = [
+        #None,
         MitmProxy(),
-        #NodeHttpProxy(),
-        #GoMitmProxy(),
-        #MartianProxy(),
-        #GoProxy(),
+        NodeHttpProxy(),
+        GoMitmProxy(),
+        MartianProxy(),
+        GoProxy(),
     ]
 
     dataframes = []
 
     for proxy in proxies:
+        short_name = proxy.short_name if proxy else "baseline"
+
         for protocol in ["http", "https"]:
-            with open(data_path / f"{proxy.short_name}_{protocol}.json") as file:
+            with open(data_path / f"{short_name}_{protocol}.json") as file:
                 payload = load(file)
                 dataframes.append(
                     pd.DataFrame(payload["stats"]).assign(
-                        proxy=proxy.short_name,
+                        proxy=short_name,
                         protocol=protocol,
                     )
                 )
 
     df = pd.concat(dataframes)
-    print(df)
+    df = df[df["Name"] == "/handle"]
+
+    # TODO: perform aggregation in python
+    df.to_csv("results.csv")
