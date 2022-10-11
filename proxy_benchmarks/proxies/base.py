@@ -11,6 +11,11 @@ class ProxyBase(ABC):
     def launch(self):
         pass
 
+    @property
+    @abstractmethod
+    def short_name(self) -> str:
+        pass
+
     @abstractmethod
     def __repr__(self) -> str:
-        return super().__repr__()
+        pass

@@ -1,4 +1,7 @@
+from csv import DictReader
+from dataclasses import asdict
 from functools import partial
+from json import dump, load
 from pathlib import Path
 from socket import gethostbyname
 from subprocess import run
@@ -7,10 +10,13 @@ from time import sleep
 from typing import Callable
 from urllib.parse import urlparse
 
-from click import group
+import pandas as pd
+from click import Path as ClickPath
+from click import group, option
 from rich.console import Console
 
 from proxy_benchmarks.fingerprinting import Ja3Record, ja3_by_ip
+from proxy_benchmarks.load_test import LoadTestResults, run_load_test
 from proxy_benchmarks.networking import capture_network_traffic
 from proxy_benchmarks.proxies.base import ProxyBase
 from proxy_benchmarks.proxies.gomitmproxy import GoMitmProxy
@@ -19,8 +25,6 @@ from proxy_benchmarks.proxies.martian import MartianProxy
 from proxy_benchmarks.proxies.mitmproxy import MitmProxy
 from proxy_benchmarks.proxies.node_http_proxy import NodeHttpProxy
 from proxy_benchmarks.requests import ChromeRequest, PythonRequest, RequestBase
-from subprocess import Popen
-from proxy_benchmarks.assets import get_asset_path
 
 # To test TCP connection, we need a valid https url
 TEST_TCP_URL = "https://freeman.vc"
@@ -29,6 +33,11 @@ console = Console(soft_wrap=True)
 
 
 def get_fingerprint(url: str, request_fn: Callable[[str], None]) -> dict[str, list[Ja3Record]]:
+    """
+    Given a URL to test, and a function which issues a network request, return a dictionary
+    of IP addresses to a list of JA3 fingerprints.
+
+    """
     with TemporaryDirectory() as directory:
         capture_path = Path(directory) / "capture.pcap"
         with capture_network_traffic(capture_path):
@@ -114,28 +123,95 @@ def fingerprint(self):
                         console.print(f"  {proxy} {proxy_url}: {digests}")
 
 
-@main.command()
-def load_test_baseline():
-    try:
-        server_process = Popen("go run .", shell=True, cwd=get_asset_path("speed-test/server"))
+def finalize_results(
+    output_path: Path,
+    proxy_name: str,
+    http_results: LoadTestResults,
+    https_results: LoadTestResults,
+):
+    """
+    Consolidates the raw results from Locust into one main json file and saves to the
+    output path with a filename convention.
 
-        spawn_processes = 5
-        run_time = "1m"
+    """
+    for prefix, results in [("http", http_results), ("https", https_results)]:
+        consolidated_results = {}
 
-        # Launch the coordination server
-        # This will wait to launch until N processes have connected
-        main_process = Popen(f"poetry run locust --run-time {run_time} --master --expect-workers {spawn_processes} --config=no_proxy_load_locust.conf", shell=True, cwd=get_asset_path("speed-test/locust"))
+        for key, path in asdict(results).items():
+            with open(path) as file:
+                contents = DictReader(file)
+                consolidated_results[key] = list(contents)
 
-        worker_processes = [
-            Popen("poetry run locust --worker --config=no_proxy_load_locust.conf", shell=True, cwd=get_asset_path("speed-test/locust"))
-            for _ in range(spawn_processes)
-        ]
+        with open(output_path / f"{proxy_name}_{prefix}.json", "w") as file:
+            dump(consolidated_results, file)
 
-        print("Will load...")
 
-        main_process.wait()
-    finally:
-        server_process.terminate()
-        main_process.terminate()
-        for process in worker_processes:
-            process.terminate()
+@main.group()
+def load_test():
+    pass
+
+
+@load_test.command()
+@option("--data-path", type=ClickPath(dir_okay=True, file_okay=False), required=True)
+def execute(data_path):
+    output_path = Path(data_path).expanduser()
+    output_path.mkdir(exist_ok=True)
+
+    divider = "-" * console.width
+
+    console.print(f"{divider}\nWill perform baseline load test...\n{divider}", style="bold blue")
+    http_baseline_results = run_load_test("http_baseline_locust.conf", run_time_seconds=10)
+    https_baseline_results = run_load_test("https_baseline_locust.conf", run_time_seconds=10)
+    console.print("Baseline test completed...")
+
+    finalize_results(output_path, "baseline", http_baseline_results, https_baseline_results)
+
+    proxies: list[ProxyBase] = [
+        MitmProxy(),
+        #NodeHttpProxy(),
+        #GoMitmProxy(),
+        #MartianProxy(),
+        #GoProxy(),
+    ]
+
+    for proxy in proxies:
+        console.print(f"{divider}\nWill perform http load test with {proxy}...\n{divider}", style="bold blue")
+
+        with proxy.launch():
+            run_load_test(f"http_locust.conf", proxy_port=proxy.port, run_time_seconds=10)
+            run_load_test(f"https_locust.conf", proxy_port=proxy.port, run_time_seconds=10)
+
+            # Move somewhere permanent since these will be overridden
+            finalize_results(output_path, proxy.short_name, http_baseline_results, https_baseline_results)
+
+        console.print(f"Load test with {proxy} completed...")
+
+
+@load_test.command()
+@option("--data-path", type=ClickPath(exists=True, dir_okay=True, file_okay=False), required=True)
+def analyze(data_path):
+    data_path = Path(data_path).expanduser()
+
+    proxies: list[ProxyBase] = [
+        MitmProxy(),
+        #NodeHttpProxy(),
+        #GoMitmProxy(),
+        #MartianProxy(),
+        #GoProxy(),
+    ]
+
+    dataframes = []
+
+    for proxy in proxies:
+        for protocol in ["http", "https"]:
+            with open(data_path / f"{proxy.short_name}_{protocol}.json") as file:
+                payload = load(file)
+                dataframes.append(
+                    pd.DataFrame(payload["stats"]).assign(
+                        proxy=proxy.short_name,
+                        protocol=protocol,
+                    )
+                )
+
+    df = pd.concat(dataframes)
+    print(df)

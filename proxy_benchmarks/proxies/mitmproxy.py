@@ -46,5 +46,9 @@ class MitmProxy(ProxyBase):
         finally:
             process.terminate()
 
+    @property
+    def short_name(self) -> str:
+        return "mitmproxy"
+
     def __repr__(self) -> str:
         return f"MitmProxy(port={self.port})"

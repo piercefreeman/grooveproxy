@@ -11,3 +11,4 @@ cert.key
 
 # Load test
 **/data/*.csv
+**/load-test/*.json

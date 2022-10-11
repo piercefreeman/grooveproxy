@@ -16,6 +16,8 @@ mitmproxy = "^8.1.1"
 playwright = "^1.27.0"
 rich = "^12.6.0"
 locust = "^2.12.1"
+ConfigArgParse = "^1.5.3"
+pandas = "^1.5.0"
 
 [tool.poetry.scripts]
 benchmark = "proxy_benchmarks.cli:main"

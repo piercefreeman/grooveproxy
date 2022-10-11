@@ -25,5 +25,9 @@ class NodeHttpProxy(ProxyBase):
         finally:
             process.terminate()
 
+    @property
+    def short_name(self) -> str:
+        return "node_http_proxy"
+
     def __repr__(self) -> str:
         return f"NodeHttpProxy(port={self.port})"
