@@ -4,12 +4,9 @@ node_modules
 
 # Certificate cache
 .http-mitm-proxy
-ca.crt
-ca.key
-cert.crt
-cert.key
-mitmproxy-ca.crt
-mitmproxy-ca.key
+**/*.crt
+**/*.key
+**/*.pem
 
 # Load test
 **/data/*.csv

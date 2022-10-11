@@ -7,7 +7,7 @@ const chalk = require('chalk');
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 program
-  .option('--port')
+  .option('--port <int>')
 
 program.parse();
 const { port } = program.opts();
@@ -24,5 +24,19 @@ proxy.onError(function(ctx, err) {
       console.log(chalk.red("MacOS: security add-trusted-cert -r trustRoot -k ~/Library/Keychains/login.keychain-db ./.http-mitm-proxy/certs/ca.pem"));
   }
 });
+
+
+const exitOnSignal = (signal) => {
+  process.on(signal, () => {
+    console.log('\nCaught ' + signal + ', exiting');
+    proxy.close();
+    process.exit(1);
+  });
+}
+
+exitOnSignal('SIGINT');
+exitOnSignal('SIGTERM');
+
+console.log(`Will launch proxy on port ${port}`)
 
 proxy.listen({port: port});

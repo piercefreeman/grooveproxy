@@ -6,7 +6,7 @@ from pathlib import Path
 from socket import gethostbyname
 from subprocess import run
 from tempfile import TemporaryDirectory
-from time import sleep
+from time import sleep, time
 from typing import Callable
 from urllib.parse import urlparse
 
@@ -25,11 +25,9 @@ from proxy_benchmarks.proxies.martian import MartianProxy
 from proxy_benchmarks.proxies.mitmproxy import MitmProxy
 from proxy_benchmarks.proxies.node_http_proxy import NodeHttpProxy
 from proxy_benchmarks.requests import ChromeRequest, PythonRequest, RequestBase
-#from warnings import filterwarnings
+from requests import get
+from tqdm import tqdm
 
-# We expect that ssl errors will occur because of our self-signed certificates
-# Don't pollute the output with this class of warnings
-#filterwarnings("ignore", message="Unverified HTTPS request")
 
 # To test TCP connection, we need a valid https url
 TEST_TCP_URL = "https://freeman.vc"
@@ -68,7 +66,46 @@ def main():
     pass
 
 @main.command()
-def fingerprint(self):
+def basic_ssl_test():
+    divider = "-" * console.width
+
+    proxies: list[ProxyBase] = [
+        #MitmProxy(),
+        NodeHttpProxy(),
+        #GoMitmProxy(),
+        #MartianProxy(),
+        #GoProxy(),
+    ]
+
+    request = ChromeRequest(headless=False, keep_open=True)
+
+    with run_load_server() as load_server_definition:
+        synthetic_ip_addresses = SyntheticHosts(
+            [
+                SyntheticHostDefinition(
+                    name="load-server",
+                    http_port=load_server_definition["http"],
+                    https_port=load_server_definition["https"],
+                )
+            ]
+        ).configure()
+        synthetic_ip_address = next(iter(synthetic_ip_addresses.values()))
+        print("\nSynthetic IP", synthetic_ip_address)
+
+        print("Waiting for manual client access...")
+        if input(" > Press enter when ready...") != "":
+            return
+
+        for proxy in proxies:
+                with proxy.launch():
+                    console.print(f"{divider}\nTesting {request} with proxy {proxy})\n{divider}", style="bold blue")
+                    request.handle_request(
+                        f"https://{synthetic_ip_address}/handle",
+                        proxy=f"http://localhost:{proxy.port}",
+                    )
+
+@main.command()
+def fingerprint():
     # Ensure we have sudo permissions
     print("proxy-benchmarks needs to capture network traffic...")
     run(f"sudo echo 'Confirmation success...\n'", shell=True)
@@ -165,21 +202,24 @@ def execute(data_path, runtime_seconds):
 
     divider = "-" * console.width
 
-    with run_load_server() as load_server_definition:
-        # Launch a synthetic host for our fake server because some MITM implementations
-        # (specifically [gomitmproxy](https://github.com/AdguardTeam/gomitmproxy/blob/c7fb1711772b738d3f89b55615b6ac0c8e312367/proxy.go#L661)
-        # but there might be others) require a tls connection on port 443.
-        synthetic_ip_addresses = SyntheticHosts(
-            [
-                SyntheticHostDefinition(
-                    name="load-server",
-                    http_port=load_server_definition["http"],
-                    https_port=load_server_definition["https"],
-                )
-            ]
-        ).configure()
-        synthetic_ip_address = next(iter(synthetic_ip_addresses.values()))
+    load_http_port = 3010
+    load_https_port = 3011
 
+    # Launch a synthetic host for our fake server because some MITM implementations
+    # (specifically [gomitmproxy](https://github.com/AdguardTeam/gomitmproxy/blob/c7fb1711772b738d3f89b55615b6ac0c8e312367/proxy.go#L661)
+    # but there might be others) require a tls connection on port 443.
+    synthetic_ip_addresses = SyntheticHosts(
+        [
+            SyntheticHostDefinition(
+                name="load-server",
+                http_port=load_http_port,
+                https_port=load_https_port,
+            )
+        ]
+    ).configure()
+    synthetic_ip_address = next(iter(synthetic_ip_addresses.values()))
+
+    with run_load_server(port=load_http_port, tls_port=load_https_port) as load_server_definition:
         console.print(f"{divider}\nWill perform baseline load test...\n{divider}", style="bold blue")
         http_baseline_results = run_load_test(f"http://{synthetic_ip_address}", "http_baseline_locust.conf", run_time_seconds=runtime_seconds)
         https_baseline_results = run_load_test(f"https://{synthetic_ip_address}", "https_baseline_locust.conf", run_time_seconds=runtime_seconds)
@@ -187,39 +227,24 @@ def execute(data_path, runtime_seconds):
 
         finalize_results(output_path, "baseline", http_baseline_results, https_baseline_results)
 
-        proxies: list[ProxyBase] = [
-            MitmProxy(),
-            NodeHttpProxy(),
-            GoMitmProxy(),
-            MartianProxy(),
-            GoProxy(),
-        ]
+    proxies: list[ProxyBase] = [
+        GoMitmProxy(),
+        MitmProxy(),
+        NodeHttpProxy(),
+        MartianProxy(),
+        GoProxy(),
+    ]
 
-        for proxy in proxies:
+    for proxy in proxies:
+        # Restart the server every time to make sure that we're not leaking resources
+        # that might affect the load times / testing
+        with run_load_server(port=load_http_port, tls_port=load_https_port):
             with proxy.launch():
                 console.print(f"{divider}\nWill perform http load test with {proxy}...\n{divider}", style="bold blue")
                 http_baseline_results = run_load_test(f"http://{synthetic_ip_address}", f"http_locust.conf", proxy=proxy, run_time_seconds=runtime_seconds)
 
                 console.print(f"{divider}\nWill perform https load test with {proxy}...\n{divider}", style="bold blue")
                 https_baseline_results = run_load_test(f"https://{synthetic_ip_address}", f"https_locust.conf", proxy=proxy, run_time_seconds=runtime_seconds)
-
-                # from requests import get
-                # from time import sleep
-                # proxies = {
-                #     "http": f"http://localhost:{proxy.port}",
-                #     "https": f"http://localhost:{proxy.port}",
-                # }
-                # response = get(
-                #     f"https://{synthetic_ip_address}/handler",
-                #     proxies=proxies,
-                #     verify=False,
-                #     cert=(
-                #         str(proxy.certificate_authority.public),
-                #         str(proxy.certificate_authority.key),
-                #     )
-                # )
-                # print(response)
-                # sleep(20)
 
                 # Move somewhere permanent since these will be overridden
                 finalize_results(output_path, proxy.short_name, http_baseline_results, https_baseline_results)
@@ -233,7 +258,7 @@ def analyze(data_path):
     data_path = Path(data_path).expanduser()
 
     proxies: list[ProxyBase] = [
-        #None,
+        None,
         MitmProxy(),
         NodeHttpProxy(),
         GoMitmProxy(),
@@ -261,3 +286,57 @@ def analyze(data_path):
 
     # TODO: perform aggregation in python
     df.to_csv("results.csv")
+
+
+@main.command()
+@option("--samples", type=int, default=100)
+def speed_certificate_generation_test(samples):
+    proxies: list[ProxyBase] = [
+        MitmProxy(),
+        NodeHttpProxy(),
+        GoMitmProxy(),
+        MartianProxy(),
+        GoProxy(),
+    ]
+
+    with run_load_server() as load_server_definition:
+        synthetic_ip_addresses = SyntheticHosts(
+            [
+                SyntheticHostDefinition(
+                    name="load-server",
+                    http_port=load_server_definition["http"],
+                    https_port=load_server_definition["https"],
+                )
+            ]
+        ).configure()
+        synthetic_ip_address = next(iter(synthetic_ip_addresses.values()))
+
+        # Clear out any previously generated certificates by opening and then closing
+        # the context manager
+        for proxy in proxies:
+            with proxy.launch():
+                pass
+
+        proxy_definition = {
+            "http": f"http://localhost:{proxy.port}",
+            "https": f"http://localhost:{proxy.port}",
+        }
+
+        for proxy in proxies:
+            for _ in tqdm(range(samples)):
+                with proxy.launch():
+                    start_time = time()
+                    cold_start_response = get(
+                        f"https://{synthetic_ip_address}",
+                        proxies=proxy_definition,
+                        verify=proxy.certificate_authority.public,
+                    )
+                    cold_start_time = time() - start_time
+
+                    start_time = time()
+                    warm_start_response = get(
+                        f"https://{synthetic_ip_address}",
+                        proxies=proxy_definition,
+                        verify=proxy.certificate_authority.public,
+                    )
+                    warm_start_time = time() - start_time

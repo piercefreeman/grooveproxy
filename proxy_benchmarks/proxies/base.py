@@ -13,7 +13,7 @@ class CertificateAuthority:
 
 
 class ProxyBase(ABC):
-    def __init__(self, port=8080):
+    def __init__(self, port):
         self.port = port
 
     @abstractmethod
@@ -28,16 +28,13 @@ class ProxyBase(ABC):
             sleep(1)
             timeout -= 1
         if timeout == 0:
-            print("Timed out waiting for proxy to open")
+            raise TimeoutError("Timed out waiting for proxy to open")
 
     def wait_for_close(self, timeout=20):
-        # Wait for the socket to close
-        while is_socket_bound("localhost", self.port) and timeout > 0:
-            print("Waiting for proxy port to close...")
-            sleep(1)
-            timeout -= 1
-        if timeout == 0:
-            print("Timed out waiting for proxy to close")
+        # The same logic as `wait_for_launch` doesn't apply here because the
+        # logic that checks for the socket actually keeps it open and makes it appear alive.
+        # For now this is a no-op.
+        return
 
     @property
     @abstractmethod

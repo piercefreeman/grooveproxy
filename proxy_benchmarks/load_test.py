@@ -53,13 +53,19 @@ def run_load_test(
     locust_project_path = get_asset_path("speed-test/locust")
     locust_config = load_config(locust_project_path / config_path)
 
-    env = environ.copy()
+    env = {
+        **environ,
+        "LOAD_TEST_CERTIFICATE": get_asset_path("speed-test/server/cert.crt"),
+        "LOAD_TEST_CERTIFICATE_KEY": get_asset_path("speed-test/server/cert.key"),
+    }
 
     if proxy:
         assert proxy.certificate_authority.public.exists()
         assert proxy.certificate_authority.key.exists()
 
         env["PROXY_PORT"] = str(proxy.port)
+        # Even though these certificates are in the system keychain, python still needs
+        # them explicitly specified
         env["PROXY_CERTIFICATE"] = str(proxy.certificate_authority.public)
         env["PROXY_CERTIFICATE_KEY"] = str(proxy.certificate_authority.key)
 

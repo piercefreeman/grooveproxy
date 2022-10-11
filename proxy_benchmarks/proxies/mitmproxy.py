@@ -9,7 +9,7 @@ from pathlib import Path
 from subprocess import Popen
 from time import sleep
 
-from mitmproxy import ctx
+from mitmproxy import ctx, http
 
 from proxy_benchmarks.networking import is_socket_bound
 from proxy_benchmarks.proxies.base import ProxyBase, CertificateAuthority
@@ -21,22 +21,38 @@ class Counter:
     def __init__(self):
         self.num = 0
 
-    def request(self, flow):
+    def request(self, flow: http.HTTPFlow):
         print("FLOW", flow)
         self.num = self.num + 1
         ctx.log.info("We've seen %d flows" % self.num)
+
+        # if flow.request.pretty_url == "https://example.com/path":
+        #     flow.response = http.Response.make(
+        #         200,
+        #         b"Hello World",
+        #         {"Content-Type": "text/html"},
+        #     )
+
+    def response(self, flow: http.HTTPFlow):
+        # flow.response.content += b"\nInjected content"
+        pass
 
 
 addons = [Counter()]
 
 
 class MitmProxy(ProxyBase):
+    def __init__(self):
+        super().__init__(port=6013)
+
     @contextmanager
     def launch(self):
         current_extension_path = Path(__file__).resolve()
         certificate_directory = get_asset_path("proxies/mitmproxy")
 
         process = Popen(
+            # NOTE: Even though our local testing server validates in the system keychain, mitmdump appears to
+            # do a separate validation and throws a 502 bad gateway error when using locally signed certificates.
             f"poetry run mitmdump -s '{current_extension_path}' --listen-port {self.port} --set confdir={certificate_directory} --ssl-insecure",
             shell=True,
         )

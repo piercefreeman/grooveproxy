@@ -10,6 +10,9 @@ from proxy_benchmarks.proxies.base import ProxyBase, CertificateAuthority
 
 
 class GoMitmProxy(ProxyBase):
+    def __init__(self):
+        super().__init__(port=6010)
+
     @contextmanager
     def launch(self):
         #env = {

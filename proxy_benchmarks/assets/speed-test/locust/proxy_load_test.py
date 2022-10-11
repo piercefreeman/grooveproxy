@@ -2,10 +2,6 @@ from os import getenv
 
 from locust import FastHttpUser, HttpUser, events, task
 from locust.runners import MasterRunner, WorkerRunner
-#from warnings import filterwarnings
-
-
-#filterwarnings("ignore", message="Unverified HTTPS request")
 
 
 @events.init.add_listener
@@ -40,9 +36,5 @@ class WebsiteUser(HttpUser):
         self.client.get(
             "/handle",
             proxies=proxies,
-            verify=False,
-            #cert=(
-            #    proxy_certificate,
-            #    proxy_certificate_key
-            #),
+            verify=proxy_certificate,
         )

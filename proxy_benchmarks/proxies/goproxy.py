@@ -9,6 +9,9 @@ from proxy_benchmarks.proxies.base import ProxyBase, CertificateAuthority
 
 
 class GoProxy(ProxyBase):
+    def __init__(self):
+        super().__init__(port=6011)
+
     @contextmanager
     def launch(self):
         current_extension_path = get_asset_path("proxies/goproxy")

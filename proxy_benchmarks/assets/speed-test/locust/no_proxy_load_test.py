@@ -1,6 +1,6 @@
 from locust import FastHttpUser, HttpUser, events, task
 from locust.runners import MasterRunner, WorkerRunner
-
+from os import getenv
 
 @events.init.add_listener
 def on_locust_init(environment, **_kwargs):
@@ -11,8 +11,15 @@ def on_locust_init(environment, **_kwargs):
         environment.stats.use_response_times_cache = True
 
 
+load_test_certificate = getenv("LOAD_TEST_CERTIFICATE")
+load_test_certificate_key = getenv("LOAD_TEST_CERTIFICATE_KEY")
+
+
 #class WebsiteUser(FastHttpUser):
 class WebsiteUser(HttpUser):
     @task
     def index(self):
-        self.client.get("/handle", verify=False)
+        self.client.get(
+            "/handle",
+            verify=load_test_certificate,
+        )

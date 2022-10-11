@@ -18,6 +18,7 @@ openssl req \
     -sha256 \
     -days 3650
 
-security add-trusted-cert -r trustRoot -k ~/Library/Keychains/login.keychain-db ./cert.crt
+#security add-trusted-cert -r trustRoot -k ~/Library/Keychains/login.keychain-db ./cert.crt
+sudo security add-trusted-cert -d -p ssl -p basic -k /Library/Keychains/System.keychain ./cert.crt
 
 rm openssl_config.conf

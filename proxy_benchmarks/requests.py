@@ -27,8 +27,15 @@ class PythonRequest(RequestBase):
 
 
 class ChromeRequest(RequestBase):
-    def __init__(self, headless):
+    def __init__(self, headless, keep_open: bool = False):
+        """
+        :param headless: Whether to open the browser in headless mode.
+        :param keep_open: Useful for debugging. Can optionally stop every time a
+            page loads to better inspect the outgoing network requests and certificates.
+
+        """
         self.headless = headless
+        self.keep_open = keep_open
 
     def handle_request(self, url: str, proxy: str | None):
         with sync_playwright() as p:
@@ -41,15 +48,22 @@ class ChromeRequest(RequestBase):
                         "server": proxy,
                     }
                 } if proxy else {}),
-                "ignore_https_errors": True,
+                # We explicitly don't set `ignore_https_errors=True` because we expect
+                # that the setup pipeline will correctly configure our proxy certificates
+                # and our test server certificates
             }
-            print("PAYLOAD", payload)
 
             context = browser.new_context(
                 **payload
             )
             page = context.new_page()
             response = page.goto(url)
+
+            if self.keep_open:
+                # TODO: Update coloring in case it's only available in the scrollback history
+                if input("Press any key to continue..."):
+                    pass
+
             assert response.ok
             browser.close()
 
