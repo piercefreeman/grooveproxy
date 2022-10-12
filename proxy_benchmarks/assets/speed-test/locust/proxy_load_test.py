@@ -1,6 +1,11 @@
 from os import getenv
 
-from locust import FastHttpUser, HttpUser, events, task
+from locust import (
+    FastHttpUser,
+    HttpUser,
+    events,
+    task,
+)
 from locust.runners import MasterRunner, WorkerRunner
 
 

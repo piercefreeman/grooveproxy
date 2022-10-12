@@ -1,6 +1,13 @@
-from locust import FastHttpUser, HttpUser, events, task
-from locust.runners import MasterRunner, WorkerRunner
 from os import getenv
+
+from locust import (
+    FastHttpUser,
+    HttpUser,
+    events,
+    task,
+)
+from locust.runners import MasterRunner, WorkerRunner
+
 
 @events.init.add_listener
 def on_locust_init(environment, **_kwargs):

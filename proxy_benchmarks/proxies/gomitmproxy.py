@@ -4,7 +4,7 @@ from time import sleep
 
 from proxy_benchmarks.assets import get_asset_path
 from proxy_benchmarks.process import terminate_all
-from proxy_benchmarks.proxies.base import ProxyBase, CertificateAuthority
+from proxy_benchmarks.proxies.base import CertificateAuthority, ProxyBase
 
 
 class GoMitmProxy(ProxyBase):

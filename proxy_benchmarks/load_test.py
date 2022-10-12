@@ -1,15 +1,15 @@
+from contextlib import contextmanager
 from dataclasses import dataclass
 from os import environ
 from subprocess import Popen
+from time import sleep
 
 from configargparse import DefaultConfigFileParser
-from contextlib import contextmanager
 
 from proxy_benchmarks.assets import get_asset_path
+from proxy_benchmarks.networking import is_socket_bound
 from proxy_benchmarks.process import terminate_all
 from proxy_benchmarks.proxies.base import ProxyBase
-from proxy_benchmarks.networking import is_socket_bound
-from time import sleep
 
 
 @dataclass

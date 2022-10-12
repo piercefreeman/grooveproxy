@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
-from pathlib import Path
 from dataclasses import dataclass
-from proxy_benchmarks.networking import is_socket_bound
+from pathlib import Path
 from time import sleep
+
+from proxy_benchmarks.networking import is_socket_bound
 
 
 @dataclass

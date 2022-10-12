@@ -1,14 +1,13 @@
 from contextlib import closing, contextmanager
+from csv import DictReader
+from dataclasses import dataclass, field
+from io import StringIO
 from pathlib import Path
 from socket import AF_INET, SOCK_STREAM, socket
 from subprocess import PIPE, Popen, run
-from dataclasses import dataclass, field
+from tempfile import NamedTemporaryFile
 
 from psutil import net_if_addrs
-from subprocess import run
-from tempfile import NamedTemporaryFile
-from csv import DictReader
-from io import StringIO
 
 
 def is_socket_bound(port) -> bool:
