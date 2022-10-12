@@ -1,6 +1,16 @@
 from enum import Enum
 
 
+class MimicTypeEnum(Enum):
+    """
+    Defines the type of proxy to run - sometimes we have the standard proxy and the one
+    that attempts to mimic the connection of the client.
+
+    """
+    STANDARD ="standard"
+    MIMIC = "mimic"
+
+
 class TLSVersionEnum(Enum):
     """
     Verison of TLS protocol, currently supported 1-3
@@ -11,6 +21,7 @@ class TLSVersionEnum(Enum):
     TLS1_VERSION = 0x0301
     TLS1_1_VERSION = 0x0302
     TLS1_2_VERSION = 0x0303
+
 
 class TLSKnownExtensionEnum(Enum):
     """

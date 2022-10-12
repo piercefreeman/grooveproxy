@@ -12,6 +12,7 @@ from click import (
 from requests import get
 from tqdm import tqdm
 
+from proxy_benchmarks.enums import MimicTypeEnum
 from proxy_benchmarks.load_test import run_load_server
 from proxy_benchmarks.networking import SyntheticHostDefinition, SyntheticHosts
 from proxy_benchmarks.proxies.base import ProxyBase
@@ -45,9 +46,9 @@ def execute(obj, samples, data_path):
     proxies: list[ProxyBase] = [
         MitmProxy(),
         NodeHttpProxy(),
-        GoMitmProxy(),
+        GoMitmProxy(MimicTypeEnum.STANDARD),
         MartianProxy(),
-        GoProxy(),
+        GoProxy(MimicTypeEnum.STANDARD),
     ]
 
     proxy_samples = []

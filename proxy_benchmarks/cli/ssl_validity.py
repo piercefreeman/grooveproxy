@@ -2,6 +2,7 @@ from csv import DictReader
 
 from click import command, pass_obj
 
+from proxy_benchmarks.enums import MimicTypeEnum
 from proxy_benchmarks.load_test import run_load_server
 from proxy_benchmarks.networking import SyntheticHostDefinition, SyntheticHosts
 from proxy_benchmarks.proxies.base import ProxyBase
@@ -22,9 +23,9 @@ def basic_ssl_test(obj):
     proxies: list[ProxyBase] = [
         MitmProxy(),
         NodeHttpProxy(),
-        GoMitmProxy(),
+        GoMitmProxy(MimicTypeEnum.STANDARD),
         MartianProxy(),
-        GoProxy(),
+        GoProxy(MimicTypeEnum.STANDARD),
     ]
 
     request = ChromeRequest(headless=False, keep_open=True)
