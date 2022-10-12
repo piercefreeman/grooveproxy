@@ -299,6 +299,8 @@ def speed_certificate_generation_test(samples):
         GoProxy(),
     ]
 
+    proxy_samples = []
+
     with run_load_server() as load_server_definition:
         synthetic_ip_addresses = SyntheticHosts(
             [
@@ -340,3 +342,14 @@ def speed_certificate_generation_test(samples):
                         verify=proxy.certificate_authority.public,
                     )
                     warm_start_time = time() - start_time
+
+                    proxy_samples.append(
+                        proxy=proxy.short_name,
+                        cold_start=cold_start_time,
+                        cold_start_status=cold_start_response.status_code,
+                        warm_start=warm_start_time,
+                        warm_start_status=warm_start_response.status_code,
+                    )
+
+    with open("results_certificate_speed.csv", "w") as file:
+        dump(proxy_samples, file)
