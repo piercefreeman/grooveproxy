@@ -5,6 +5,11 @@ from requests import get
 
 
 class RequestBase(ABC):
+    @property
+    @abstractmethod
+    def short_name(self) -> str:
+        pass
+
     @abstractmethod
     def handle_request(self, url: str, proxy: str | None):
         pass
@@ -22,7 +27,11 @@ class PythonRequest(RequestBase):
         )
         assert response.ok
 
-    def __repr__(self):
+    @property
+    def short_name(self) -> str:
+        return "python"
+
+    def __repr__(self) -> str:
         return "PythonRequest()"
 
 
@@ -67,5 +76,9 @@ class ChromeRequest(RequestBase):
             assert response.ok
             browser.close()
 
-    def __repr__(self):
+    @property
+    def short_name(self) -> str:
+        return "chrome_headless" if self.headless else "chrome_headfull"
+
+    def __repr__(self) -> str:
         return f"ChromeRequest(headless={self.headless})"
