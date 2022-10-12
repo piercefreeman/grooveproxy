@@ -30,7 +30,7 @@ const main = async () => {
     console.log("Will add root certificate to keychain...")
 
     // Trust this newly generated file
-    execSync(`security add-trusted-cert -r trustRoot -k ~/Library/Keychains/login.keychain-db ${certsFolder}/ca.pem`);
+    execSync(`sudo security add-trusted-cert -d -p ssl -p basic -k /Library/Keychains/System.keychain ${certsFolder}/ca.pem`);
 
     console.log(chalk.green("Proxy setup succeeded."))
 }

@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "speed-test-server"
+version = "0.1.0"
+description = ""
+authors = ["Pierce Freeman <piercefreeman@gmail.com>"]
+readme = "README.md"
+packages = [{include = "speed_test_server"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

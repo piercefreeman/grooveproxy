@@ -7,8 +7,7 @@ from time import sleep
 from typing import Callable
 from urllib.parse import urlparse
 
-from click import command
-from rich.console import Console
+from click import command, pass_obj
 
 from proxy_benchmarks.fingerprinting import Ja3Record, ja3_by_ip
 from proxy_benchmarks.networking import capture_network_traffic
@@ -20,35 +19,16 @@ from proxy_benchmarks.proxies.mitmproxy import MitmProxy
 from proxy_benchmarks.proxies.node_http_proxy import NodeHttpProxy
 from proxy_benchmarks.requests import ChromeRequest, PythonRequest, RequestBase
 
+
 # To test TCP connection, we need a valid https url
 TEST_TCP_URL = "https://freeman.vc"
 
-console = Console(soft_wrap=True)
-
-
-def get_fingerprint(url: str, request_fn: Callable[[str], None]) -> dict[str, list[Ja3Record]]:
-    with TemporaryDirectory() as directory:
-        capture_path = Path(directory) / "capture.pcap"
-        with capture_network_traffic(capture_path):
-            print("Capturing traffic...")
-            request_fn(url)
-
-            # We notice an occasional lag in writing capture details to disk, sleep to allow
-            # the process to catch up
-            sleep(2)
-
-        network_records = ja3_by_ip(capture_path)
-
-    # We only care about the ones to our test domain, since other network requests
-    # might have been made by the system daemons or user in this capture interval
-    test_host = urlparse(url)
-    search_ip = gethostbyname(test_host.netloc) 
-
-    return network_records[search_ip]
-
-
 @command()
-def main():
+@pass_obj
+def fingerprint(obj):
+    console = obj["console"]
+    divider = obj["divider"]
+
     # Ensure we have sudo permissions
     print("proxy-benchmarks needs to capture network traffic...")
     run(f"sudo echo 'Confirmation success...\n'", shell=True)
@@ -106,3 +86,29 @@ def main():
                     console.print(f"\nFingerprint values are not consistent across proxies:", style="bold red")
                     for proxy_url, digests in fingerprint_by_proxy.items():
                         console.print(f"  {proxy} {proxy_url}: {digests}")
+
+
+def get_fingerprint(url: str, request_fn: Callable[[str], None]) -> dict[str, list[Ja3Record]]:
+    """
+    Given a URL to test, and a function which issues a network request, return a dictionary
+    of IP addresses to a list of JA3 fingerprints.
+
+    """
+    with TemporaryDirectory() as directory:
+        capture_path = Path(directory) / "capture.pcap"
+        with capture_network_traffic(capture_path):
+            print("Capturing traffic...")
+            request_fn(url)
+
+            # We notice an occasional lag in writing capture details to disk, sleep to allow
+            # the process to catch up
+            sleep(2)
+
+        network_records = ja3_by_ip(capture_path)
+
+    # We only care about the ones to our test domain, since other network requests
+    # might have been made by the system daemons or user in this capture interval
+    test_host = urlparse(url)
+    search_ip = gethostbyname(test_host.netloc) 
+
+    return network_records[search_ip]
