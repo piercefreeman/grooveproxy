@@ -11,9 +11,11 @@ set -e
 
 # gomitmproxy
 (cd proxy_benchmarks/assets/proxies/gomitmproxy && go install && ./setup.sh)
+(cd proxy_benchmarks/assets/proxies/gomitmproxy-mimic && go install && ./setup.sh)
 
 # goproxy
 (cd proxy_benchmarks/assets/proxies/goproxy && go install && ./setup.sh)
+(cd proxy_benchmarks/assets/proxies/goproxy-mimic && go install && ./setup.sh)
 
 # martian
 (cd proxy_benchmarks/assets/proxies/martian && go install && ./setup.sh)

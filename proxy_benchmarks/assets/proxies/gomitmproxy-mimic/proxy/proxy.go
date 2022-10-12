@@ -71,7 +71,8 @@ func NewProxy(config Config) *Proxy {
 				},
 			},
 			// @pierce - This is this only logic that we're overriding in this fork - it should be possible
-			// to integrate this with the shipping package
+			// to integrate this with the shipping package. This isn't trivial however because Proxy.transport
+			// is a private struct variable so it's not visible by third party packages like `main`.
 			DialTLS: func(network, addr string) (net.Conn, error) {
 				conn, err := net.Dial(network, addr)
 				if err != nil {
