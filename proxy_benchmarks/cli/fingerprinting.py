@@ -16,8 +16,10 @@ from click import (
     option,
     pass_obj,
 )
+from rich.console import Console
 from rich.table import Table
 
+from proxy_benchmarks.enums import MimicTypeEnum
 from proxy_benchmarks.fingerprinting import CaptureParser, Ja3Record, ja3_by_ip
 from proxy_benchmarks.networking import capture_network_traffic
 from proxy_benchmarks.proxies.base import ProxyBase
@@ -27,7 +29,6 @@ from proxy_benchmarks.proxies.martian import MartianProxy
 from proxy_benchmarks.proxies.mitmproxy import MitmProxy
 from proxy_benchmarks.proxies.node_http_proxy import NodeHttpProxy
 from proxy_benchmarks.requests import ChromeRequest, PythonRequest, RequestBase
-from proxy_benchmarks.enums import MimicTypeEnum
 
 
 # To test TCP connection, we need a valid https url
@@ -60,16 +61,18 @@ def execute(obj, output_directory):
     run(f"sudo echo 'Confirmation success...\n'", shell=True)
 
     proxies: list[ProxyBase] = [
-        #MitmProxy(),
-        #NodeHttpProxy(),
+        MitmProxy(),
+        NodeHttpProxy(),
         GoMitmProxy(MimicTypeEnum.STANDARD),
-        #MartianProxy(),
-        #GoProxy(),
+        GoMitmProxy(MimicTypeEnum.MIMIC),
+        MartianProxy(),
+        GoProxy(MimicTypeEnum.STANDARD),
+        GoProxy(MimicTypeEnum.MIMIC),
     ]
 
     runners: list[RequestBase] = [
-        #PythonRequest(),
-        #ChromeRequest(headless=True),
+        PythonRequest(),
+        ChromeRequest(headless=True),
         ChromeRequest(headless=False),
     ]
 
@@ -117,10 +120,9 @@ def execute(obj, output_directory):
 
 
 @fingerprint.command()
-@option("--file1", type=ClickPath(exists=True), required=True)
-@option("--file2", type=ClickPath(exists=True), required=True)
+@option("--file", type=ClickPath(exists=True), required=True, multiple=True)
 @pass_obj
-def compare(obj, file1, file2):
+def compare(obj, file: list[str]):
     """
     Compare two packet cache files that are cached on disk.
 
@@ -130,8 +132,8 @@ def compare(obj, file1, file2):
 
     compare_raw(
         {
-            Path(file1).name: file1,
-            Path(file2).name: file2
+            Path(path).name: path
+            for path in file
         },
         console,
         divider
@@ -156,6 +158,8 @@ def compare_dynamic(obj, proxy: list[str]):
     supported_proxies = {
         "gomitmproxy": GoMitmProxy(MimicTypeEnum.STANDARD),
         "gomitmproxy-mimic": GoMitmProxy(MimicTypeEnum.MIMIC),
+        "goproxy": GoProxy(MimicTypeEnum.STANDARD),
+        "goproxy-mimic": GoProxy(MimicTypeEnum.MIMIC),
     }
 
     proxies = [
@@ -198,8 +202,8 @@ def compare_dynamic(obj, proxy: list[str]):
 
 def compare_raw(
     file_definitions: dict[str, str | Path],
-    console,
-    divider
+    console: Console,
+    divider: str,
 ):
     """
     Requires you to have the `tshark` utility provided by Wireshark to format the stat files.
@@ -229,15 +233,8 @@ def compare_raw(
         for file in files
     ]
 
-    captures = [
-        loads(output.stdout)
-        for output in outputs
-    ]
-
-    hellos = [
-        parser.get_hello_client(capture, search_ip)
-        for capture in captures
-    ]
+    captures = [loads(output.stdout) for output in outputs ]
+    hellos = [parser.get_hello_client(capture, search_ip) for capture in captures]
 
     for i, hello in enumerate(hellos):
         if not hello:
@@ -300,6 +297,7 @@ def compare_raw(
             )
 
         console.print(table)
+
 
 @contextmanager
 def optional_output_path(output_directory: Path, proxy: ProxyBase, runner: RequestBase, proxy_url: str | None) -> Path:

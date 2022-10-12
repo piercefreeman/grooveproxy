@@ -11,6 +11,7 @@ from click import (
     pass_obj,
 )
 
+from proxy_benchmarks.enums import MimicTypeEnum
 from proxy_benchmarks.load_test import LoadTestResults, run_load_server, run_load_test
 from proxy_benchmarks.networking import SyntheticHostDefinition, SyntheticHosts
 from proxy_benchmarks.proxies.base import ProxyBase
@@ -63,11 +64,11 @@ def execute(obj, data_path, runtime_seconds):
         finalize_results(output_path, "baseline", http_baseline_results, https_baseline_results)
 
     proxies: list[ProxyBase] = [
-        GoMitmProxy(),
+        GoMitmProxy(MimicTypeEnum.STANDARD),
         MitmProxy(),
         NodeHttpProxy(),
         MartianProxy(),
-        GoProxy(),
+        GoProxy(MimicTypeEnum.STANDARD),
     ]
 
     for proxy in proxies:
@@ -96,9 +97,9 @@ def analyze(data_path):
         None,
         MitmProxy(),
         NodeHttpProxy(),
-        GoMitmProxy(),
+        GoMitmProxy(MimicTypeEnum.STANDARD),
         MartianProxy(),
-        GoProxy(),
+        GoProxy(MimicTypeEnum.STANDARD),
     ]
 
     dataframes = []
