@@ -42,3 +42,31 @@ Install the browsers that we want to test through the proxy.
 ```
 poetry run playwright install chromium
 ```
+
+## Benchmarking Harness
+
+MITM proxies re-issue the commands that clients give them. Test whether fingerprints of the proxies align with their originally issuing browsers.
+
+```
+poetry run benchmark fingerprint execute [--output-directory ./fingerprint-capture]
+```
+
+View a more specific breakdown of the Ja3 fingerprint differences between the proxy and baseline (will execute the baseline comparison by default).
+
+```
+poetry run benchmark fingerprint compare-dynamic --proxy gomitmproxy
+```
+
+Conduct a load test of each proxy server, separately over http and https connections since https has additional overhead of having to manage the server->proxy certificate decryption and the proxy->client re-encryption.
+
+```
+poetry run benchmark load-test execute --data-path ./load-test
+poetry run benchmark load-test analyze --data-path ./load-test
+```
+
+Conduct a speed test of the MITM host certificate generation process. In the wild we expect this to happen relatively frequently (every time we visit a new host) whereas in our load test this was completely excluded, because all proxies have a method to cache previously generated certificates either in memory or on disk.
+
+```
+poetry run benchmark speed-test execute --data-path ./speed-test
+poetry run benchmark speed-test analyze --data-path ./speed-test
+```

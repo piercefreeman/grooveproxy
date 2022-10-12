@@ -11,4 +11,5 @@ node_modules
 # Load test
 **/data/*.csv
 **/load-test/*.json
+**/load-test-*/*.json
 **/certificate-generation-test/*.json

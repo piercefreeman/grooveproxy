@@ -33,7 +33,7 @@ class GoMitmProxy(ProxyBase):
             terminate_all(process)
 
             # Wait for the socket to close
-            self.wait_for_close()
+            self.wait_for_close(60)
 
     @property
     def certificate_authority(self) -> CertificateAuthority:

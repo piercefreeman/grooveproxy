@@ -65,10 +65,12 @@ def execute(obj, data_path, runtime_seconds):
 
     proxies: list[ProxyBase] = [
         GoMitmProxy(MimicTypeEnum.STANDARD),
+        GoMitmProxy(MimicTypeEnum.MIMIC),
         MitmProxy(),
         NodeHttpProxy(),
         MartianProxy(),
         GoProxy(MimicTypeEnum.STANDARD),
+        GoProxy(MimicTypeEnum.MIMIC),
     ]
 
     for proxy in proxies:
@@ -98,8 +100,10 @@ def analyze(data_path):
         MitmProxy(),
         NodeHttpProxy(),
         GoMitmProxy(MimicTypeEnum.STANDARD),
+        GoMitmProxy(MimicTypeEnum.MIMIC),
         MartianProxy(),
         GoProxy(MimicTypeEnum.STANDARD),
+        GoProxy(MimicTypeEnum.MIMIC),
     ]
 
     dataframes = []

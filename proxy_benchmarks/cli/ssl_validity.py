@@ -17,6 +17,12 @@ from proxy_benchmarks.requests import ChromeRequest
 @command()
 @pass_obj
 def basic_ssl_test(obj):
+    """
+    Walk through the different proxy servers and test their SSL validity separately.
+    Upon issuing each command will wait for the user to press enter to continue. This allows
+    you to fully inspect to certificate in the Chrome inspector and debugging console.
+
+    """
     console = obj["console"]
     divider = obj["divider"]
 
