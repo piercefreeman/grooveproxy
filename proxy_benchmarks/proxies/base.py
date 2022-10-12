@@ -23,7 +23,7 @@ class ProxyBase(ABC):
 
     def wait_for_launch(self, timeout=20):
         # Wait for the socket to open
-        while not is_socket_bound("localhost", self.port) and timeout > 0:
+        while not is_socket_bound(self.port) and timeout > 0:
             print("Waiting for proxy port to open...")
             sleep(1)
             timeout -= 1
@@ -31,10 +31,13 @@ class ProxyBase(ABC):
             raise TimeoutError("Timed out waiting for proxy to open")
 
     def wait_for_close(self, timeout=20):
-        # The same logic as `wait_for_launch` doesn't apply here because the
-        # logic that checks for the socket actually keeps it open and makes it appear alive.
-        # For now this is a no-op.
-        return
+        # Wait for the socket to open
+        while is_socket_bound(self.port) and timeout > 0:
+            print("Waiting for proxy port to close...")
+            sleep(1)
+            timeout -= 1
+        if timeout == 0:
+            raise TimeoutError("Timed out waiting for proxy to close")
 
     @property
     @abstractmethod

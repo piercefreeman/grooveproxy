@@ -7,14 +7,18 @@ from dataclasses import dataclass, field
 from psutil import net_if_addrs
 from subprocess import run
 from tempfile import NamedTemporaryFile
+from csv import DictReader
+from io import StringIO
 
 
-def is_socket_bound(host, port) -> bool:
-    with closing(socket(AF_INET, SOCK_STREAM)) as sock:
-        if sock.connect_ex((host, port)) == 0:
-            return False
-        else:
-            return True
+def is_socket_bound(port) -> bool:
+    # Parse the currently active ports via tabular notation
+    result = run(f"lsof -ti:{port}", shell=True, stdout=PIPE, stderr=PIPE)
+
+    if result.stdout.decode().strip():
+        return True
+    else:
+        return False
 
 
 @contextmanager

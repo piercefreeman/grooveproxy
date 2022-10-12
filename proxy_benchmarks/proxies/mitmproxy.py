@@ -11,7 +11,6 @@ from time import sleep
 
 from mitmproxy import ctx, http
 
-from proxy_benchmarks.networking import is_socket_bound
 from proxy_benchmarks.proxies.base import ProxyBase, CertificateAuthority
 from proxy_benchmarks.process import terminate_all
 from proxy_benchmarks.assets import get_asset_path

@@ -284,13 +284,21 @@ def analyze(data_path):
     df = pd.concat(dataframes)
     df = df[df["Name"] == "/handle"]
 
-    # TODO: perform aggregation in python
-    df.to_csv("results.csv")
+    df.to_csv("results_load_test.csv")
 
 
-@main.command()
+@main.group()
+def speed_certificate_generation_test():
+    pass
+
+
+@speed_certificate_generation_test.command()
 @option("--samples", type=int, default=100)
-def speed_certificate_generation_test(samples):
+@option("--data-path", type=ClickPath(dir_okay=True, file_okay=False), required=True)
+def execute_2(samples, data_path):
+    data_path = Path(data_path).expanduser()
+    data_path.mkdir(exist_ok=True)
+
     proxies: list[ProxyBase] = [
         MitmProxy(),
         NodeHttpProxy(),
@@ -298,6 +306,8 @@ def speed_certificate_generation_test(samples):
         MartianProxy(),
         GoProxy(),
     ]
+
+    divider = "-" * console.width
 
     proxy_samples = []
 
@@ -315,21 +325,24 @@ def speed_certificate_generation_test(samples):
 
         # Clear out any previously generated certificates by opening and then closing
         # the context manager
+        console.print(f"{divider}\nCleaning up cached proxy certificates...\n{divider}", style="bold blue")
         for proxy in proxies:
             with proxy.launch():
                 pass
 
-        proxy_definition = {
-            "http": f"http://localhost:{proxy.port}",
-            "https": f"http://localhost:{proxy.port}",
-        }
-
         for proxy in proxies:
+            console.print(f"{divider}\nWill perform certificate generation test with {proxy}...\n{divider}", style="bold blue")
+
+            proxy_definition = {
+                "http": f"http://localhost:{proxy.port}",
+                "https": f"http://localhost:{proxy.port}",
+            }
+
             for _ in tqdm(range(samples)):
                 with proxy.launch():
                     start_time = time()
                     cold_start_response = get(
-                        f"https://{synthetic_ip_address}",
+                        f"https://{synthetic_ip_address}/handle",
                         proxies=proxy_definition,
                         verify=proxy.certificate_authority.public,
                     )
@@ -337,19 +350,37 @@ def speed_certificate_generation_test(samples):
 
                     start_time = time()
                     warm_start_response = get(
-                        f"https://{synthetic_ip_address}",
+                        f"https://{synthetic_ip_address}/handle",
                         proxies=proxy_definition,
                         verify=proxy.certificate_authority.public,
                     )
                     warm_start_time = time() - start_time
 
                     proxy_samples.append(
-                        proxy=proxy.short_name,
-                        cold_start=cold_start_time,
-                        cold_start_status=cold_start_response.status_code,
-                        warm_start=warm_start_time,
-                        warm_start_status=warm_start_response.status_code,
+                        dict(
+                            proxy=proxy.short_name,
+                            cold_start=cold_start_time,
+                            cold_start_status=cold_start_response.status_code,
+                            warm_start=warm_start_time,
+                            warm_start_status=warm_start_response.status_code,                            
+                        )
                     )
 
-    with open("results_certificate_speed.csv", "w") as file:
+    with open(data_path / "raw.json", "w") as file:
         dump(proxy_samples, file)
+
+@speed_certificate_generation_test.command()
+@option("--data-path", type=ClickPath(dir_okay=True, file_okay=False), required=True)
+def analyze_2(data_path):
+    data_path = Path(data_path).expanduser()
+
+    df = pd.read_json(data_path / "raw.json")
+    df = df.assign(
+        difference=df.cold_start-df.warm_start,
+    )
+
+    # Confirm basic success statistics
+    print(df.groupby("proxy")["cold_start_status", "warm_start_status"].value_counts())
+
+    distribution_df = df.groupby("proxy")[["cold_start", "warm_start", "difference"]].describe().reset_index()
+    distribution_df.to_csv("results_certificate_speed.csv")
