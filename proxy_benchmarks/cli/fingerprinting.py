@@ -27,6 +27,7 @@ from proxy_benchmarks.proxies.martian import MartianProxy
 from proxy_benchmarks.proxies.mitmproxy import MitmProxy
 from proxy_benchmarks.proxies.node_http_proxy import NodeHttpProxy
 from proxy_benchmarks.requests import ChromeRequest, PythonRequest, RequestBase
+from proxy_benchmarks.enums import MimicTypeEnum
 
 
 # To test TCP connection, we need a valid https url
@@ -59,16 +60,16 @@ def execute(obj, output_directory):
     run(f"sudo echo 'Confirmation success...\n'", shell=True)
 
     proxies: list[ProxyBase] = [
-        MitmProxy(),
-        NodeHttpProxy(),
-        GoMitmProxy(),
-        MartianProxy(),
-        GoProxy(),
+        #MitmProxy(),
+        #NodeHttpProxy(),
+        GoMitmProxy(MimicTypeEnum.STANDARD),
+        #MartianProxy(),
+        #GoProxy(),
     ]
 
     runners: list[RequestBase] = [
-        PythonRequest(),
-        ChromeRequest(headless=True),
+        #PythonRequest(),
+        #ChromeRequest(headless=True),
         ChromeRequest(headless=False),
     ]
 
@@ -121,19 +122,101 @@ def execute(obj, output_directory):
 @pass_obj
 def compare(obj, file1, file2):
     """
-    Requires you to have the `tshark` utility provided by Wireshark to format the stat files.
+    Compare two packet cache files that are cached on disk.
 
     """
     console = obj["console"]
     divider = obj["divider"]
+
+    compare_raw(
+        {
+            Path(file1).name: file1,
+            Path(file2).name: file2
+        },
+        console,
+        divider
+    )
+
+
+@fingerprint.command()
+@option("--proxy", multiple=True)
+@pass_obj
+def compare_dynamic(obj, proxy: list[str]):
+    """
+    Compare a proxy server dynamically. Integrated execution and comparison.
+
+    """
+    console = obj["console"]
+    divider = obj["divider"]
+
+    # Ensure we have sudo permissions
+    print("proxy-benchmarks needs to capture network traffic...")
+    run(f"sudo echo 'Confirmation success...\n'", shell=True)
+
+    supported_proxies = {
+        "gomitmproxy": GoMitmProxy(MimicTypeEnum.STANDARD),
+        "gomitmproxy-mimic": GoMitmProxy(MimicTypeEnum.MIMIC),
+    }
+
+    proxies = [
+        supported_proxies[proxy_name]
+        for proxy_name in proxy
+    ]
+
+    runner = ChromeRequest(headless=False)
+
+    # Proxy -> Path
+    fingerprint_paths = {}
+
+    with TemporaryDirectory() as temp_dir:
+        no_proxy_path = Path(temp_dir) / "no_proxy.pcap"
+        get_fingerprint(
+            TEST_TCP_URL,
+            request_fn=partial(
+                runner.handle_request,
+                proxy=None,
+            ),
+            capture_path=no_proxy_path 
+        )
+        fingerprint_paths["no-proxy"] = no_proxy_path
+
+        for proxy in proxies:
+            proxy_path = Path(temp_dir) / f"{proxy.short_name}-proxy.pcap"
+            with proxy.launch():
+                get_fingerprint(
+                    TEST_TCP_URL,
+                    request_fn=partial(
+                        runner.handle_request,
+                        proxy=f"http://localhost:{proxy.port}",
+                    ),
+                    capture_path=proxy_path, 
+                )
+                fingerprint_paths[proxy.short_name] = proxy_path
+
+        compare_raw(fingerprint_paths, console, divider)
+
+
+def compare_raw(
+    file_definitions: dict[str, str | Path],
+    console,
+    divider
+):
+    """
+    Requires you to have the `tshark` utility provided by Wireshark to format the stat files.
+
+    :param files: mapping of { packet name: path }
+
+    """
     parser = CaptureParser(console)
 
     test_host = urlparse(TEST_TCP_URL)
     search_ip = gethostbyname(test_host.netloc)
     console.print(f"Searching for IP: {search_ip}")
 
-    file1 = Path(file1).expanduser()
-    file2 = Path(file2).expanduser()
+    files = [
+        Path(file).expanduser()
+        for file in file_definitions.values()
+    ]
 
     # By default some json list outputs will share a key
     # This was particularly problematic for `tls.handshake.ciphersuite` values. The schema defines
@@ -141,60 +224,82 @@ def compare(obj, file1, file2):
     # will be collapsed into one record. This was reported [here](https://www.wireshark.org/lists/wireshark-dev/201706/msg00058.html)
     # and fixed in a subsequent patch that's only enabled when passing the `--no-duplicate-keys` key.
 
-    file1_output = run(["tshark", "-r", file1, "-T", "json", "--no-duplicate-keys"], stdout=PIPE, stderr=PIPE)
-    file2_output = run(["tshark", "-r", file2, "-T", "json", "--no-duplicate-keys"], stdout=PIPE, stderr=PIPE)
+    outputs = [
+        run(["tshark", "-r", file, "-T", "json", "--no-duplicate-keys"], stdout=PIPE, stderr=PIPE)
+        for file in files
+    ]
 
-    file1_capture = loads(file1_output.stdout)
-    file2_capture = loads(file2_output.stdout)
+    captures = [
+        loads(output.stdout)
+        for output in outputs
+    ]
 
-    file1_hello = parser.get_hello_client(file1_capture, search_ip)
-    file2_hello = parser.get_hello_client(file2_capture, search_ip)
+    hellos = [
+        parser.get_hello_client(capture, search_ip)
+        for capture in captures
+    ]
 
-    if not file1_hello:
-        console.print(f"Could not find TCP hello world in {file1}", style="bold red")
-        return
-    if not file2_hello:
-        console.print(f"Could not find TCP hello world in {file2}", style="bold red")
-        return
+    for i, hello in enumerate(hellos):
+        if not hello:
+            console.print(f"Could not find TCP hello world in {files[i]}", style="bold red")
+            return
 
-    file1_ja3 = parser.build_ja3_payload(file1_hello)
-    file2_ja3 = parser.build_ja3_payload(file2_hello)
+    file_ja3s = [
+        parser.build_ja3_payload(hello)
+        for hello in hellos
+    ]
 
-    # Name the table columns after the file names
-    col1_name = file1.name
-    col2_name = file2.name
-
-    for key in asdict(file1_ja3).keys():
+    for key in asdict(file_ja3s[0]).keys():
         console.print(f"{divider}\nCompare `{key}`\n{divider}", style="bold blue")
 
         table = Table(show_header=True, header_style="bold magenta")
         table.add_column("Value")
-        table.add_column(col1_name)
-        table.add_column(col2_name)
+        for col_name in file_definitions.keys():
+            table.add_column(col_name)
 
-        file1_value = getattr(file1_ja3, key)
-        file2_value = getattr(file2_ja3, key)
+        file_values = [
+            getattr(file_ja3, key)
+            for file_ja3 in file_ja3s
+        ]
 
-        if isinstance(file1_value, set):
-            for value in file1_value | file2_value:
-                style = "bold green" if value in file1_value and value in file2_value else "bold red"
+        if isinstance(file_values[0], set):
+            comparison_values = {
+                (
+                    value,
+                    *[
+                        value in file_value
+                        for file_value in file_values
+                    ]
+                )
+                for file_value in file_values
+                for value in file_value
+            }
+
+            # Group by similar truthy values, with True/True being first
+            comparison_values = sorted(comparison_values, key=lambda x: (x[1], x[2]), reverse=True)
+
+            for value, *include_truthy in comparison_values:            
+                style = "bold green" if all(include_truthy) else "bold red"
                 table.add_row(
                     str(value),
-                    f"[{style}]{value in file1_value}[/{style}]",
-                    f"[{style}]{value in file2_value}[/{style}]",
+                    *[
+                        f"[{style}]{file_includes}[/{style}]"
+                        for file_includes in include_truthy
+                    ]
                 )
         else:
             # Compare standard value
-            values_equal = file1_value == file2_value
+            values_equal = len(set(file_values)) == 1
             style = "bold green" if values_equal else "bold red"
             table.add_row(
                 "",
-                f"[{style}]{file1_value}[/{style}]",
-                f"[{style}]{file2_value}[/{style}]",
+                *[
+                    f"[{style}]{value}[/{style}]"
+                    for value in file_values
+                ]
             )
 
         console.print(table)
-
 
 @contextmanager
 def optional_output_path(output_directory: Path, proxy: ProxyBase, runner: RequestBase, proxy_url: str | None) -> Path:
