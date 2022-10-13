@@ -31,7 +31,7 @@ func main() {
 	flag.Parse()
 
 	// Set our own CA instead of the one that's default bundled with the proxy
-	setCA("ca.crt", "ca.key")
+	setCA("ssl/ca.crt", "ssl/ca.key")
 
 	proxy := goproxy.NewProxyHttpServer()
 	proxy.Verbose = *verbose

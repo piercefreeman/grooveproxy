@@ -13,3 +13,5 @@ node_modules
 **/load-test/*.json
 **/load-test-*/*.json
 **/certificate-generation-test/*.json
+
+.pytest_cache

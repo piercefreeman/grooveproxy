@@ -11,4 +11,5 @@ elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
     # GNU/Linux
     cp .http-mitm-proxy/certs/ca.pem /usr/local/share/ca-certificates/http-mitm-proxy-ca.pem
     sudo update-ca-certificates
+    certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n "http-mitm-proxy" -i /usr/local/share/ca-certificates/http-mitm-proxy-ca.pem
 fi

@@ -1,7 +1,12 @@
 FROM ubuntu:22.04
 
 RUN apt-get -y update \
-    && apt-get -y install python3 python3.10-venv curl gcc python3-dev sudo ca-certificates tcpdump golang-go git lsof
+    && apt-get -y install python3 python3.10-venv curl gcc python3-dev sudo ca-certificates tcpdump golang-go git lsof software-properties-common
+
+RUN sudo add-apt-repository -y ppa:wireshark-dev/stable \
+    && sudo apt-get -y update \
+    && echo "wireshark-common wireshark-common/install-setuid boolean true" | sudo debconf-set-selections \
+    && sudo DEBIAN_FRONTEND=noninteractive apt-get -y install tshark
 
 RUN mkdir -p /usr/local/nvm/
 ENV NVM_DIR /usr/local/nvm
@@ -30,6 +35,12 @@ ADD . /app
 # Mount the scripts, don't perform any additional installation
 RUN poetry install --no-interaction
 
+# Install the certificate management tools that Chromium uses on Linux
+# This is required to add our custom certificates
+# https://chromium.googlesource.com/chromium/src/+/master/docs/linux/cert_management.md
+RUN apt-get install -y libnss3-tools
+RUN mkdir -p $HOME/.pki/nssdb
+
 # Install the dependent packages and root certificates
 RUN ./setup.sh
 
@@ -41,4 +52,5 @@ RUN poetry run playwright install chromium
 
 #USER docker
 
+ENV DOCKER "1"
 ENV PYTHONUNBUFFERED "1"

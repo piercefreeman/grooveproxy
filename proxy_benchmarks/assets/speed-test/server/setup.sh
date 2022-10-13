@@ -49,6 +49,12 @@ elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
     # GNU/Linux
     cp ./cert.crt /usr/local/share/ca-certificates/speed-test-server.crt
     sudo update-ca-certificates
+    #certutil -A -n "speed-test-server" -d ~/.pki/nssdb -t C,, -a -i /usr/local/share/ca-certificates/speed-test-server.crt
+    certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n "speed-test-server" -i /usr/local/share/ca-certificates/speed-test-server.crt
 fi
 
 rm openssl_config.conf
+
+mkdir -p ssl
+cp cert.key ssl/cert.key
+cp cert.crt ssl/cert.crt

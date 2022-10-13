@@ -1,15 +1,13 @@
 from pathlib import Path
+from os import getenv
 
 def is_docker() -> bool:
     """
     Check if we are running inside a Docker container.
 
     """
-    cgroup_path = Path("/proc/self/cgroup")
-    if not cgroup_path.exists():
-        return False
-    with open("/proc/self/cgroup", 'r') as f:
-        return "docker" in f.read()
+    # Assume that we have injected an env variable into docker at build time
+    return getenv("DOCKER") == "1"
 
 
 def wrap_command_with_sudo(command: list[str]):

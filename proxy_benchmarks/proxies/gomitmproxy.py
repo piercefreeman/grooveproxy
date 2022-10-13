@@ -50,8 +50,8 @@ class GoMitmProxy(ProxyBase):
     @property
     def certificate_authority(self) -> CertificateAuthority:
         return CertificateAuthority(
-            public=get_asset_path(f"proxies/{self.project_path}/ca.crt"),
-            key=get_asset_path(f"proxies/{self.project_path}/ca.key"),
+            public=get_asset_path(f"proxies/{self.project_path}/ssl/ca.crt"),
+            key=get_asset_path(f"proxies/{self.project_path}/ssl/ca.key"),
         )
 
     @property

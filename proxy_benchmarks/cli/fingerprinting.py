@@ -184,6 +184,7 @@ def compare_dynamic_raw(obj, runner: RequestBase, proxies: list[ProxyBase]):
 
     with TemporaryDirectory() as temp_dir:
         # Baseline fingerprint
+        console.print(f"{divider}\nFingerprinting baseline\n{divider}", style="bold blue")
         no_proxy_path = Path(temp_dir) / "no_proxy.pcap"
         get_fingerprint(
             TEST_TCP_URL,
@@ -197,8 +198,9 @@ def compare_dynamic_raw(obj, runner: RequestBase, proxies: list[ProxyBase]):
 
         # Proxy specific fingerprints
         for proxy in proxies:
+            console.print(f"{divider}\nFingerprinting proxy `{proxy}`\n{divider}", style="bold blue")
+
             proxy_path = Path(temp_dir) / f"{proxy.short_name}-proxy.pcap"
-            print("Will launch proxy...")
             with proxy.launch():
                 get_fingerprint(
                     TEST_TCP_URL,

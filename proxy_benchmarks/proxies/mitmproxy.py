@@ -47,7 +47,7 @@ class MitmProxy(ProxyBase):
     @contextmanager
     def launch(self):
         current_extension_path = Path(__file__).resolve()
-        certificate_directory = get_asset_path("proxies/mitmproxy")
+        certificate_directory = get_asset_path("proxies/mitmproxy/ssl")
 
         process = Popen(
             # NOTE: Even though our local testing server validates in the system keychain, mitmdump appears to
@@ -70,8 +70,8 @@ class MitmProxy(ProxyBase):
     @property
     def certificate_authority(self) -> CertificateAuthority:
         return CertificateAuthority(
-            public=get_asset_path("proxies/mitmproxy/mitmproxy-ca.crt"),
-            key=get_asset_path("proxies/mitmproxy/mitmproxy-ca.key"),
+            public=get_asset_path("proxies/mitmproxy/ssl/mitmproxy-ca.crt"),
+            key=get_asset_path("proxies/mitmproxy/ssl/mitmproxy-ca.key"),
         )
 
     @property

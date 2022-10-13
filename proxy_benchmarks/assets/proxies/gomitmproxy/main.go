@@ -38,7 +38,7 @@ func main() {
 	}()
 
 	// READ CERT AND KEY
-	tlsCert, err := tls.LoadX509KeyPair("ca.crt", "ca.key")
+	tlsCert, err := tls.LoadX509KeyPair("ssl/ca.crt", "ssl/ca.key")
 	if err != nil {
 		log.Fatal(err)
 	}

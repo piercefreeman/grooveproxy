@@ -31,8 +31,8 @@ class MartianProxy(ProxyBase):
     @property
     def certificate_authority(self) -> CertificateAuthority:
         return CertificateAuthority(
-            public=get_asset_path("proxies/martian/ca.crt"),
-            key=get_asset_path("proxies/martian/ca.key"),
+            public=get_asset_path("proxies/martian/ssl/ca.crt"),
+            key=get_asset_path("proxies/martian/ssl/ca.key"),
         )
 
     @property

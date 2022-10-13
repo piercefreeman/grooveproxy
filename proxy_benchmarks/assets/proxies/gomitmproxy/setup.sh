@@ -14,4 +14,9 @@ elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
     # GNU/Linux
     cp ./ca.crt /usr/local/share/ca-certificates/gomitmproxy-ca.crt
     sudo update-ca-certificates
+    certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n "gomitmproxy" -i /usr/local/share/ca-certificates/gomitmproxy-ca.crt
 fi
+
+mkdir -p ssl
+cp ca.crt ssl/ca.crt
+cp ca.key ssl/ca.key

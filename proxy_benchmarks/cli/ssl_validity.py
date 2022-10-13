@@ -27,13 +27,13 @@ def basic_ssl_test(obj):
     divider = obj["divider"]
 
     proxies: list[ProxyBase] = [
-        #MitmProxy(),
-        #NodeHttpProxy(),
-        #GoMitmProxy(MimicTypeEnum.STANDARD),
-        #GoMitmProxy(MimicTypeEnum.MIMIC),
-        #MartianProxy(),
-        #GoProxy(MimicTypeEnum.STANDARD),
+        GoProxy(MimicTypeEnum.STANDARD),
         GoProxy(MimicTypeEnum.MIMIC),
+        MitmProxy(),
+        NodeHttpProxy(),
+        GoMitmProxy(MimicTypeEnum.STANDARD),
+        GoMitmProxy(MimicTypeEnum.MIMIC),
+        MartianProxy(),
     ]
 
     request = ChromeRequest(headless=False, keep_open=True)
