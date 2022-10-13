@@ -52,8 +52,8 @@ func getCredentials(cert *string, key *string) (*x509.Certificate, interface{}, 
 func main() {
 	var (
 		port         = flag.Int("port", 8080, "bind port")
-		cert         = flag.String("cert", "ca.crt", "filepath to the CA certificate used to sign MITM certificates")
-		key          = flag.String("key", "ca.key", "filepath to the private key of the CA used to sign MITM certificates")
+		cert         = flag.String("cert", "ssl/ca.crt", "filepath to the CA certificate used to sign MITM certificates")
+		key          = flag.String("key", "ssl/ca.key", "filepath to the private key of the CA used to sign MITM certificates")
 		organization = flag.String("organization", "Martian Proxy", "organization name for MITM certificates")
 		validity     = flag.Duration("validity", time.Hour, "window of time that MITM certificates are valid")
 	)

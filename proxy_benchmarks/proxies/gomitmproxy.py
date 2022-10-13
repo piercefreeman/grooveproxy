@@ -7,6 +7,7 @@ from proxy_benchmarks.enums import MimicTypeEnum
 from proxy_benchmarks.process import terminate_all
 from proxy_benchmarks.proxies.base import CertificateAuthority, ProxyBase
 
+
 proxy_configurations = {
     MimicTypeEnum.STANDARD: dict(
         project_path="gomitmproxy",

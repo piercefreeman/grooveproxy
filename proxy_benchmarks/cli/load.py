@@ -32,37 +32,6 @@ def load_test():
 @option("--runtime-seconds", type=int, default=60)
 @pass_obj
 def execute(obj, data_path, runtime_seconds):
-    console = obj["console"]
-    divider = obj["divider"]
-
-    output_path = Path(data_path).expanduser()
-    output_path.mkdir(exist_ok=True)
-
-    load_http_port = 3010
-    load_https_port = 3011
-
-    # Launch a synthetic host for our fake server because some MITM implementations
-    # (specifically [gomitmproxy](https://github.com/AdguardTeam/gomitmproxy/blob/c7fb1711772b738d3f89b55615b6ac0c8e312367/proxy.go#L661)
-    # but there might be others) require a tls connection on port 443.
-    synthetic_ip_addresses = SyntheticHosts(
-        [
-            SyntheticHostDefinition(
-                name="load-server",
-                http_port=load_http_port,
-                https_port=load_https_port,
-            )
-        ]
-    ).configure()
-    synthetic_ip_address = next(iter(synthetic_ip_addresses.values()))
-
-    with run_load_server(port=load_http_port, tls_port=load_https_port) as load_server_definition:
-        console.print(f"{divider}\nWill perform baseline load test...\n{divider}", style="bold blue")
-        http_baseline_results = run_load_test(f"http://{synthetic_ip_address}", "http_baseline_locust.conf", run_time_seconds=runtime_seconds)
-        https_baseline_results = run_load_test(f"https://{synthetic_ip_address}", "https_baseline_locust.conf", run_time_seconds=runtime_seconds)
-        console.print("Baseline test completed...")
-
-        finalize_results(output_path, "baseline", http_baseline_results, https_baseline_results)
-
     proxies: list[ProxyBase] = [
         GoMitmProxy(MimicTypeEnum.STANDARD),
         GoMitmProxy(MimicTypeEnum.MIMIC),
@@ -73,21 +42,7 @@ def execute(obj, data_path, runtime_seconds):
         GoProxy(MimicTypeEnum.MIMIC),
     ]
 
-    for proxy in proxies:
-        # Restart the server every time to make sure that we're not leaking resources
-        # that might affect the load times / testing
-        with run_load_server(port=load_http_port, tls_port=load_https_port):
-            with proxy.launch():
-                console.print(f"{divider}\nWill perform http load test with {proxy}...\n{divider}", style="bold blue")
-                http_baseline_results = run_load_test(f"http://{synthetic_ip_address}", f"http_locust.conf", proxy=proxy, run_time_seconds=runtime_seconds)
-
-                console.print(f"{divider}\nWill perform https load test with {proxy}...\n{divider}", style="bold blue")
-                https_baseline_results = run_load_test(f"https://{synthetic_ip_address}", f"https_locust.conf", proxy=proxy, run_time_seconds=runtime_seconds)
-
-                # Move somewhere permanent since these will be overridden
-                finalize_results(output_path, proxy.short_name, http_baseline_results, https_baseline_results)
-
-            console.print(f"Load test with {proxy} completed...")
+    execute_raw(obj, data_path, runtime_seconds, proxies)
 
 
 @load_test.command()
@@ -127,6 +82,55 @@ def analyze(data_path, output_filename):
     df = df[df["Name"] == "/handle"]
 
     df.to_csv(output_filename)
+
+
+def execute_raw(obj, data_path: str | Path, runtime_seconds: int, proxies: list[ProxyBase]):
+    console = obj["console"]
+    divider = obj["divider"]
+
+    output_path = Path(data_path).expanduser()
+    output_path.mkdir(exist_ok=True)
+
+    load_http_port = 3010
+    load_https_port = 3011
+
+    # Launch a synthetic host for our fake server because some MITM implementations
+    # (specifically [gomitmproxy](https://github.com/AdguardTeam/gomitmproxy/blob/c7fb1711772b738d3f89b55615b6ac0c8e312367/proxy.go#L661)
+    # but there might be others) require a tls connection on port 443.
+    synthetic_ip_addresses = SyntheticHosts(
+        [
+            SyntheticHostDefinition(
+                name="load-server",
+                http_port=load_http_port,
+                https_port=load_https_port,
+            )
+        ]
+    ).configure()
+    synthetic_ip_address = next(iter(synthetic_ip_addresses.values()))
+
+    with run_load_server(port=load_http_port, tls_port=load_https_port) as load_server_definition:
+        console.print(f"{divider}\nWill perform baseline load test...\n{divider}", style="bold blue")
+        http_baseline_results = run_load_test(f"http://{synthetic_ip_address}", "http_baseline_locust.conf", run_time_seconds=runtime_seconds)
+        https_baseline_results = run_load_test(f"https://{synthetic_ip_address}", "https_baseline_locust.conf", run_time_seconds=runtime_seconds)
+        console.print("Baseline test completed...")
+
+        finalize_results(output_path, "baseline", http_baseline_results, https_baseline_results)
+
+    for proxy in proxies:
+        # Restart the server every time to make sure that we're not leaking resources
+        # that might affect the load times / testing
+        with run_load_server(port=load_http_port, tls_port=load_https_port):
+            with proxy.launch():
+                console.print(f"{divider}\nWill perform http load test with {proxy}...\n{divider}", style="bold blue")
+                http_baseline_results = run_load_test(f"http://{synthetic_ip_address}", f"http_locust.conf", proxy=proxy, run_time_seconds=runtime_seconds)
+
+                console.print(f"{divider}\nWill perform https load test with {proxy}...\n{divider}", style="bold blue")
+                https_baseline_results = run_load_test(f"https://{synthetic_ip_address}", f"https_locust.conf", proxy=proxy, run_time_seconds=runtime_seconds)
+
+                # Move somewhere permanent since these will be overridden
+                finalize_results(output_path, proxy.short_name, http_baseline_results, https_baseline_results)
+
+            console.print(f"Load test with {proxy} completed...")
 
 
 def finalize_results(

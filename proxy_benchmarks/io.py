@@ -1,5 +1,6 @@
-from pathlib import Path
 from os import getenv
+from pathlib import Path
+
 
 def is_docker() -> bool:
     """

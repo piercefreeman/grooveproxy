@@ -5,6 +5,7 @@ from subprocess import PIPE, Popen, run
 from tempfile import NamedTemporaryFile
 
 from psutil import net_if_addrs
+
 from proxy_benchmarks.io import wrap_command_with_sudo
 from proxy_benchmarks.process import terminate_all
 

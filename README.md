@@ -75,3 +75,10 @@ poetry run benchmark speed-test analyze --data-path ./speed-test
 
 Q. I'm seeing an `ERR_CERT_AUTHORITY_INVALID` during tests.
 A. Each OS (and potentially browser within that OS) has a different location where it stores certificates. On Ubuntu, for instance Chrome has its own credential storage manager [[1]](https://serverfault.com/questions/946756/ssl-certificate-in-system-store-not-trusted-by-chrome) [[2]](https://chromium.googlesource.com/chromium/src/+/master/docs/linux/cert_management.md).
+
+Q. How do I perform a test inside of the docker image?
+A.
+
+```
+docker-compose run -it benchmark test -k test_fingerprint_independent
+```
