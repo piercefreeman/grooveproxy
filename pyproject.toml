@@ -25,6 +25,7 @@ benchmark = "proxy_benchmarks.cli.main:main"
 
 [tool.poetry.group.dev.dependencies]
 isort = "^5.10.1"
+pytest = "^7.1.3"
 
 [build-system]
 requires = ["poetry-core"]

@@ -33,7 +33,7 @@ class GoMitmProxy(ProxyBase):
         #}
 
         current_extension_path = get_asset_path(f"proxies/{self.project_path}")
-        process = Popen(f"go run . --port {self.port}", shell=True, cwd=current_extension_path)
+        process = Popen(["go", "run", ".", "--port", str(self.port)], cwd=current_extension_path)
 
         self.wait_for_launch()
         # Requires a bit more time to load than our other proxies

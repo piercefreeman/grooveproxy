@@ -28,7 +28,7 @@ class GoProxy(ProxyBase):
     @contextmanager
     def launch(self):
         current_extension_path = get_asset_path(f"proxies/{self.project_path}")
-        process = Popen(f"go run . --port {self.port}", shell=True, cwd=current_extension_path)
+        process = Popen(["go", "run", ".", "--port", str(self.port)], cwd=current_extension_path)
 
         # Wait for the proxy to spin up
         self.wait_for_launch()

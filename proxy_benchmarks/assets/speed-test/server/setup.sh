@@ -1,6 +1,30 @@
+#! /bin/bash
+set -e
+
+go install
+
 # Create a custom openssl config that sets the subject of the certificate to localhost
-cat /etc/ssl/openssl.cnf > openssl_config.conf
-echo '\n[SAN]\nsubjectAltName=DNS:localhost,IP:127.0.0.1,IP:127.0.0.2' >> openssl_config.conf
+if [ "$(uname)" == "Darwin" ]; then
+    # Mac OS X platform
+    FILE=/etc/ssl/openssl.cnf
+elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+    # GNU/Linux
+    FILE=/usr/lib/ssl/openssl.cnf
+fi
+
+if [ -f "$FILE" ]; then
+    echo "$FILE exists."
+else 
+    echo "$FILE does not exist."
+    exit 1
+fi
+
+cat $FILE > openssl_config.conf
+
+# Use printf instead of echo since linux doesn't render \n properly
+printf '\n[SAN]\nsubjectAltName=DNS:localhost,IP:127.0.0.1,IP:127.0.0.2' >> openssl_config.conf
+
+cat openssl_config.conf
 
 # https://serverfault.com/questions/880804/can-not-get-rid-of-neterr-cert-common-name-invalid-error-in-chrome-with-self
 openssl genrsa -out cert.key 2048
@@ -18,7 +42,13 @@ openssl req \
     -sha256 \
     -days 3650
 
-#security add-trusted-cert -r trustRoot -k ~/Library/Keychains/login.keychain-db ./cert.crt
-sudo security add-trusted-cert -d -p ssl -p basic -k /Library/Keychains/System.keychain ./cert.crt
+if [ "$(uname)" == "Darwin" ]; then
+    # Mac OS X platform
+    sudo security add-trusted-cert -d -p ssl -p basic -k /Library/Keychains/System.keychain ./cert.crt
+elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+    # GNU/Linux
+    cp ./cert.crt /usr/local/share/ca-certificates/speed-test-server.crt
+    sudo update-ca-certificates
+fi
 
 rm openssl_config.conf

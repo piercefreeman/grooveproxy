@@ -1,24 +1,32 @@
+#! /bin/bash
+
 #
 # Global setup script for the project
 #
 set -e
 
 # mitmproxy
+echo "Setting up mitmproxy"
 (cd proxy_benchmarks/assets/proxies/mitmproxy && ./setup.sh)
 
 # node_http_proxy
-(cd proxy_benchmarks/assets/proxies/node_http_proxy && npm install && npm run setup)
+echo "Setting up node_http_proxy"
+(cd proxy_benchmarks/assets/proxies/node_http_proxy && ./setup.sh)
 
 # gomitmproxy
-(cd proxy_benchmarks/assets/proxies/gomitmproxy && go install && ./setup.sh)
-(cd proxy_benchmarks/assets/proxies/gomitmproxy-mimic && go install && ./setup.sh)
+echo "Setting up gomitmproxy"
+(cd proxy_benchmarks/assets/proxies/gomitmproxy && ./setup.sh)
+(cd proxy_benchmarks/assets/proxies/gomitmproxy-mimic && ./setup.sh)
 
 # goproxy
-(cd proxy_benchmarks/assets/proxies/goproxy && go install && ./setup.sh)
-(cd proxy_benchmarks/assets/proxies/goproxy-mimic && go install && ./setup.sh)
+echo "Setting up goproxy"
+(cd proxy_benchmarks/assets/proxies/goproxy && ./setup.sh)
+(cd proxy_benchmarks/assets/proxies/goproxy-mimic && ./setup.sh)
 
 # martian
-(cd proxy_benchmarks/assets/proxies/martian && go install && ./setup.sh)
+echo "Setting up martian"
+(cd proxy_benchmarks/assets/proxies/martian && ./setup.sh)
 
 # speed-test-server
-(cd proxy_benchmarks/assets/speed-test/server && go install && ./setup.sh)
+echo "Setting up speed-test-server"
+(cd proxy_benchmarks/assets/speed-test/server && ./setup.sh)

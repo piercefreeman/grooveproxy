@@ -1,18 +1,17 @@
-from contextlib import closing, contextmanager
-from csv import DictReader
+from contextlib import contextmanager
 from dataclasses import dataclass, field
-from io import StringIO
 from pathlib import Path
-from socket import AF_INET, SOCK_STREAM, socket
 from subprocess import PIPE, Popen, run
 from tempfile import NamedTemporaryFile
 
 from psutil import net_if_addrs
+from proxy_benchmarks.io import wrap_command_with_sudo
+from proxy_benchmarks.process import terminate_all
 
 
 def is_socket_bound(port) -> bool:
     # Parse the currently active ports via tabular notation
-    result = run(f"lsof -ti:{port}", shell=True, stdout=PIPE, stderr=PIPE)
+    result = run(["lsof", f"-ti:{port}"], stdout=PIPE, stderr=PIPE)
 
     if result.stdout.decode().strip():
         return True
@@ -21,7 +20,9 @@ def is_socket_bound(port) -> bool:
 
 
 @contextmanager
-def capture_network_traffic(output_path: Path | str, interface: str = "en0"):
+#def capture_network_traffic(output_path: Path | str, interface: str = "en0"):
+def capture_network_traffic(output_path: Path | str, interface: str = "eth0"):
+    #  `['lo', 'eth0', 'tunl0', 'ip6tnl0']`.
     """
     :param interface: BSD network interface name
 
@@ -33,18 +34,30 @@ def capture_network_traffic(output_path: Path | str, interface: str = "en0"):
         raise ValueError(f"Interface `{interface}` not found in allowed list `{allowed_interfaces}`.")
 
     output_path = Path(output_path).expanduser()
-    process = Popen(f"sudo tcpdump -i {interface} -s 0 -B 524288 -w '{output_path}'", stdout=PIPE, stderr=PIPE, shell=True)
+    #process = Popen(f"sudo tcpdump -i {interface} -s 0 -B 524288 -w '{output_path}'", stdout=PIPE, stderr=PIPE, shell=True)
+    #process = Popen(f"tcpdump -i {interface} -s 0 -B 524288 -w '{output_path}'", stdout=PIPE, stderr=PIPE, shell=True)
+    print("Will capture traffic...")
+    process = Popen(wrap_command_with_sudo(["tcpdump", "-i", interface, "-s", "0", "-B", "524288", "-w", output_path]), stdout=PIPE, stderr=PIPE)
 
     yield
 
+    # Determine if the process crashed before we've explicitly closed it
+    if process.returncode is not None:
+        raise ValueError(f"Process error: {process.stdout.read().decode()} {process.stderr.read().decode()}")
+
     # We need to kill with sudo permissions, so the `terminate` signal doesn't count
-    run(f"sudo kill {process.pid}", shell=True)
+    #run(wrap_command_with_sudo([f"kill", f"{process.pid}"]))
+    print("Close capture...")
+    terminate_all(process)
+    print("Did close capture")
 
     outputs, errors = process.communicate()
+    print("-- Network Capture Outputs --")
     # Additional logging content is written to stderr, so we don't needlessly flag an error here
     for output in [outputs.decode(), errors.decode()]:
         if output.strip():
-            print("Network Outputs", output)
+            print(output)
+    print("-- End Network Capture Outputs --")
 
 
 @dataclass
@@ -139,7 +152,7 @@ class SyntheticHosts:
         }
 
         for ip_address in host_to_ip.values():
-            run(f"sudo ifconfig lo0 alias {ip_address} up", shell=True)
+            run(wrap_command_with_sudo(["ifconfig", "lo0", "alias", ip_address, "up"]))
 
         custom_routing = []
         for host, ip_address in host_to_ip.items():
@@ -171,6 +184,6 @@ class SyntheticHosts:
                 new_root_file.flush()
                 new_root_file.seek(0)
 
-                run(f"sudo pfctl -e -f {new_root_file.name}", shell=True)
+                run(wrap_command_with_sudo(["pfctl", "-e", "-f", new_root_file.name]))
 
         return host_to_ip

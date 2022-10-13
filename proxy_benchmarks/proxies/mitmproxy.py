@@ -52,8 +52,7 @@ class MitmProxy(ProxyBase):
         process = Popen(
             # NOTE: Even though our local testing server validates in the system keychain, mitmdump appears to
             # do a separate validation and throws a 502 bad gateway error when using locally signed certificates.
-            f"poetry run mitmdump -s '{current_extension_path}' --listen-port {self.port} --set confdir={certificate_directory} --ssl-insecure",
-            shell=True,
+            ["poetry", "run", "mitmdump", "-s", str(current_extension_path), "--listen-port", str(self.port), "--set", f"confdir={certificate_directory}", "--ssl-insecure"],
         )
 
         self.wait_for_launch()

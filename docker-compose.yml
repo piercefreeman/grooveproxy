@@ -1,0 +1,16 @@
+version: "3.9"
+
+services:
+  benchmark:
+    build:
+      context: .
+      dockerfile: benchmark.Dockerfile
+    volumes:
+      - ./proxy_benchmarks:/app/proxy_benchmarks
+    entrypoint: [
+      "poetry",
+      "run",
+      "pytest",
+      "-s",
+      "proxy_benchmarks/tests"
+    ]
