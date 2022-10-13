@@ -5,7 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 
-	goproxy "proxy_benchmarks/goproxymimic/proxy"
+	goproxy "github.com/piercefreeman/goproxy"
 )
 
 func setCA(caCert string, caKey string) error {

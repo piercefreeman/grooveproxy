@@ -16,14 +16,14 @@ import (
 	"syscall"
 	"time"
 
-	gomitmproxy "proxy_benchmarks/gomitmproxymimic/proxy"
-	mitm "proxy_benchmarks/gomitmproxymimic/proxy/mitm"
+	"github.com/piercefreeman/gomitmproxy"
 
-	//mimic "github.com/refraction-networking/utls"
-	mimic "crypto/tls"
+	"github.com/piercefreeman/gomitmproxy/mitm"
+
+	"crypto/tls"
 
 	"github.com/AdguardTeam/golibs/log"
-	"github.com/AdguardTeam/gomitmproxy/proxyutil"
+	"github.com/piercefreeman/gomitmproxy/proxyutil"
 )
 
 func main() {
@@ -38,7 +38,7 @@ func main() {
 	}()
 
 	// READ CERT AND KEY
-	tlsCert, err := mimic.LoadX509KeyPair("ca.crt", "ca.key")
+	tlsCert, err := tls.LoadX509KeyPair("ca.crt", "ca.key")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -50,7 +50,7 @@ func main() {
 	}
 
 	mitmConfig, err := mitm.NewConfig(x509c, privateKey, &CustomCertsStorage{
-		certsCache: map[string]*mimic.Certificate{}},
+		certsCache: map[string]*tls.Certificate{}},
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -77,6 +77,9 @@ func main() {
 		OnResponse: onResponse,
 		OnConnect:  onConnect,
 	})
+
+	// Handle our http/1 - http/2 and mimic logic
+	proxy.Transport = newRoundTripper()
 
 	err = proxy.Start()
 	if err != nil {
@@ -172,16 +175,16 @@ func onConnect(session *gomitmproxy.Session, proto string, addr string) net.Conn
 
 // CustomCertsStorage - an example of a custom cert storage
 type CustomCertsStorage struct {
-	certsCache map[string]*mimic.Certificate // cache with the generated certificates
+	certsCache map[string]*tls.Certificate // cache with the generated certificates
 }
 
 // Get gets the certificate from the storage
-func (c *CustomCertsStorage) Get(key string) (*mimic.Certificate, bool) {
+func (c *CustomCertsStorage) Get(key string) (*tls.Certificate, bool) {
 	v, ok := c.certsCache[key]
 	return v, ok
 }
 
 // Set saves the certificate to the storage
-func (c *CustomCertsStorage) Set(key string, cert *mimic.Certificate) {
+func (c *CustomCertsStorage) Set(key string, cert *tls.Certificate) {
 	c.certsCache[key] = cert
 }

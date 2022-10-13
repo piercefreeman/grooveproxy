@@ -14,8 +14,7 @@ import (
 	"regexp"
 	"strconv"
 
-	//"github.com/elazarl/goproxy"
-	goproxy "proxy_benchmarks/goproxymimic/proxy"
+	"github.com/piercefreeman/goproxy"
 )
 
 func orPanic(err error) {
@@ -40,6 +39,9 @@ func main() {
 	// Our other implementations cache the certificates for some length of time, so we do the
 	// same here for equality in benchmarking
 	proxy.CertStore = NewOptimizedCertStore()
+
+	// Fingerprint mimic logic
+	proxy.RoundTripper = newRoundTripper()
 
 	if proxy.Verbose {
 		log.Printf("Server starting up! - configured to listen on http interface %d", *port)

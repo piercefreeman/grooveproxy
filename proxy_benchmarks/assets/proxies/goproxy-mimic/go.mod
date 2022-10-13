@@ -3,7 +3,7 @@ module proxy_benchmarks/goproxymimic
 go 1.18
 
 require (
-	github.com/elazarl/goproxy v0.0.0-20220901064549-fbd10ff4f5a1
+	github.com/piercefreeman/goproxy v0.0.3
 	github.com/refraction-networking/utls v1.1.3
 	golang.org/x/net v0.0.0-20221012135044-0b7e1fb9d458
 )
