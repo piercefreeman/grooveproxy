@@ -13,8 +13,6 @@ import (
 	"sync"
 	"time"
 
-	mimic "github.com/refraction-networking/utls"
-
 	"github.com/AdguardTeam/gomitmproxy/proxyutil"
 
 	"github.com/AdguardTeam/golibs/log"
@@ -56,40 +54,8 @@ type Proxy struct {
 func NewProxy(config Config) *Proxy {
 	proxy := &Proxy{
 		Config: config,
-		transport: &http.Transport{
-			// This forces http.Transport to not upgrade requests to HTTP/2
-			// TODO: Remove when HTTP/2 can be supported
-			TLSNextProto:          make(map[string]func(string, *tls.Conn) http.RoundTripper),
-			Proxy:                 http.ProxyFromEnvironment,
-			TLSHandshakeTimeout:   tlsHandshakeTimeout,
-			ExpectContinueTimeout: time.Second,
-			TLSClientConfig: &tls.Config{
-				GetClientCertificate: func(info *tls.CertificateRequestInfo) (certificate *tls.Certificate, e error) {
-					// We purposefully cause an error here so that the http.Transport.RoundTrip method failed
-					// In this case we'll receive the error and will be able to add the host to invalidTLSHosts
-					return nil, errClientCertRequested
-				},
-			},
-			// @pierce - This is this only logic that we're overriding in this fork - it should be possible
-			// to integrate this with the shipping package. This isn't trivial however because Proxy.transport
-			// is a private struct variable so it's not visible by third party packages like `main`.
-			DialTLS: func(network, addr string) (net.Conn, error) {
-				conn, err := net.Dial(network, addr)
-				if err != nil {
-					return nil, err
-				}
-				host, _, err := net.SplitHostPort(addr)
-				if err != nil {
-					return nil, err
-				}
-				config := &mimic.Config{ServerName: host}
-				uconn := mimic.UClient(conn, config, mimic.HelloChrome_Auto)
-				if err := uconn.Handshake(); err != nil {
-					return nil, err
-				}
-				return uconn, nil
-			},
-		},
+		// https://github.com/refraction-networking/utls/issues/16
+		transport:       newRoundTripper(),
 		timeout:         defaultTimeout,
 		invalidTLSHosts: map[string]bool{},
 		closing:         make(chan bool),

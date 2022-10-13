@@ -7,11 +7,23 @@ from proxy_benchmarks.enums import MimicTypeEnum
 from proxy_benchmarks.process import terminate_all
 from proxy_benchmarks.proxies.base import CertificateAuthority, ProxyBase
 
+proxy_configurations = {
+    MimicTypeEnum.STANDARD: dict(
+        project_path="goproxy",
+        port=6012,
+    ),
+    MimicTypeEnum.MIMIC: dict(
+        project_path="goproxy-mimic",
+        port=6013,
+    )
+}
 
 class GoProxy(ProxyBase):
     def __init__(self, proxy_type: MimicTypeEnum):
-        super().__init__(port=6011)
-        self.project_path = "goproxy" if proxy_type == MimicTypeEnum.STANDARD else "goproxy-mimic"
+        configuration = proxy_configurations[proxy_type]
+
+        super().__init__(port=configuration["port"])
+        self.project_path = configuration["project_path"]
 
     @contextmanager
     def launch(self):

@@ -9,7 +9,7 @@ from proxy_benchmarks.proxies.base import CertificateAuthority, ProxyBase
 
 class MartianProxy(ProxyBase):
     def __init__(self):
-        super().__init__(port=6012)
+        super().__init__(port=6014)
 
     @contextmanager
     def launch(self):

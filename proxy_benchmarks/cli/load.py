@@ -92,7 +92,9 @@ def execute(obj, data_path, runtime_seconds):
 
 @load_test.command()
 @option("--data-path", type=ClickPath(exists=True, dir_okay=True, file_okay=False), required=True)
-def analyze(data_path):
+@option("--output-filename", type=str, default="results_load_test.csv")
+def analyze(data_path, output_filename):
+    output_filename = Path(output_filename).expanduser()
     data_path = Path(data_path).expanduser()
 
     proxies: list[ProxyBase] = [
@@ -124,7 +126,7 @@ def analyze(data_path):
     df = pd.concat(dataframes)
     df = df[df["Name"] == "/handle"]
 
-    df.to_csv("results_load_test.csv")
+    df.to_csv(output_filename)
 
 
 def finalize_results(
