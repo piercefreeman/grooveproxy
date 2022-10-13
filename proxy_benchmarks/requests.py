@@ -66,12 +66,21 @@ class ChromeRequest(RequestBase):
                 **payload
             )
             page = context.new_page()
-            response = page.goto(url)
+            page_load_exception = None
+            try:
+                response = page.goto(url)
+            except Exception as e:
+                print("Exception encountered:", e)
+                page_load_exception = e
 
             if self.keep_open:
                 # TODO: Update coloring in case it's only available in the scrollback history
                 if input("Press any key to continue..."):
                     pass
+
+            # Wait until after halting the browser to throw
+            if page_load_exception:
+                raise page_load_exception
 
             assert response.ok
             browser.close()

@@ -14,42 +14,13 @@ import (
 	"regexp"
 	"strconv"
 
-	mimic "github.com/refraction-networking/utls"
-
-	"github.com/elazarl/goproxy"
+	"github.com/piercefreeman/goproxy"
 )
 
 func orPanic(err error) {
 	if err != nil {
 		panic(err)
 	}
-}
-
-func NewProxy() *goproxy.ProxyHttpServer {
-	/*
-	 * Create a new proxy with
-	 * @pierce - primary modification for the mimic
-	 */
-	proxy := goproxy.NewProxyHttpServer()
-
-	proxy.Tr.DialTLS = func(network, addr string) (net.Conn, error) {
-		conn, err := net.Dial(network, addr)
-		if err != nil {
-			return nil, err
-		}
-		host, _, err := net.SplitHostPort(addr)
-		if err != nil {
-			return nil, err
-		}
-		config := &mimic.Config{ServerName: host}
-		uconn := mimic.UClient(conn, config, mimic.HelloChrome_Auto)
-		if err := uconn.Handshake(); err != nil {
-			return nil, err
-		}
-		return uconn, nil
-	}
-
-	return proxy
 }
 
 func main() {
@@ -62,15 +33,18 @@ func main() {
 	// Set our own CA instead of the one that's default bundled with the proxy
 	setCA("ca.crt", "ca.key")
 
-	proxy := NewProxy()
+	proxy := goproxy.NewProxyHttpServer()
 	proxy.Verbose = *verbose
 
 	// Our other implementations cache the certificates for some length of time, so we do the
 	// same here for equality in benchmarking
 	proxy.CertStore = NewOptimizedCertStore()
 
+	// Fingerprint mimic logic
+	proxy.RoundTripper = newRoundTripper()
+
 	if proxy.Verbose {
-		log.Printf("Server starting up! - configured to listen on http interface %d - mimic", *port)
+		log.Printf("Server starting up! - configured to listen on http interface %d", *port)
 	}
 
 	proxy.NonproxyHandler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {

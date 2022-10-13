@@ -9,7 +9,7 @@ from proxy_benchmarks.proxies.base import CertificateAuthority, ProxyBase
 
 class NodeHttpProxy(ProxyBase):
     def __init__(self):
-        super().__init__(port=6014)
+        super().__init__(port=6016)
 
     @contextmanager
     def launch(self):

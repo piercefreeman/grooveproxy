@@ -42,7 +42,7 @@ addons = [Counter()]
 
 class MitmProxy(ProxyBase):
     def __init__(self):
-        super().__init__(port=6013)
+        super().__init__(port=6015)
 
     @contextmanager
     def launch(self):

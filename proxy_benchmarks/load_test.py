@@ -65,7 +65,8 @@ def run_load_test(
 
         env["PROXY_PORT"] = str(proxy.port)
         # Even though these certificates are in the system keychain, python still needs
-        # them explicitly specified
+        # them explicitly specified. Since the load tester is written in python, these need
+        # to be passed into the harness.
         env["PROXY_CERTIFICATE"] = str(proxy.certificate_authority.public)
         env["PROXY_CERTIFICATE_KEY"] = str(proxy.certificate_authority.key)
 
