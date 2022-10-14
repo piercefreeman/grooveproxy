@@ -25,14 +25,7 @@ const main = async () => {
         process.exit(1);
     }
 
-    const { certsFolder } = certificate;
-
-    console.log("Will add root certificate to keychain...")
-
-    // Trust this newly generated file
-    execSync(`sudo security add-trusted-cert -d -p ssl -p basic -k /Library/Keychains/System.keychain ${certsFolder}/ca.pem`);
-
-    console.log(chalk.green("Proxy setup succeeded."))
+    console.log(chalk.green("Certificate generation succeeded."))
 }
 
 main();

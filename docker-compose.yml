@@ -1,0 +1,22 @@
+version: "3.9"
+
+services:
+  benchmark:
+    build:
+      context: .
+      dockerfile: benchmark.Dockerfile
+    cap_add:
+      # Required for synthetic 127.0.0.2 ports
+      - NET_ADMIN
+    volumes:
+      - ./proxy_benchmarks:/app/proxy_benchmarks
+      # ignore the ssl files since these are separately generated in the docker image
+      # and mounted to the relevant system paths to validate
+      - /app/proxy_benchmarks/assets/proxies/gomitmproxy/ssl
+      - /app/proxy_benchmarks/assets/proxies/gomitmproxy-mimic/ssl
+      - /app/proxy_benchmarks/assets/proxies/goproxy/ssl
+      - /app/proxy_benchmarks/assets/proxies/goproxy-mimic/ssl
+      - /app/proxy_benchmarks/assets/proxies/martian/ssl
+      - /app/proxy_benchmarks/assets/proxies/mitmproxy/ssl
+      - /app/proxy_benchmarks/assets/proxies/node_http_proxy/.http-mitm-proxy
+      - /app/proxy_benchmarks/assets/speed-test/server/ssl

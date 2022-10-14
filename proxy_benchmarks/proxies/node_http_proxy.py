@@ -16,7 +16,7 @@ class NodeHttpProxy(ProxyBase):
         current_extension_path = get_asset_path("proxies/node_http_proxy")
         # We need to launch with node and not npm, otherwise it won't receive the shutdown signal
         # and shutdown will time out
-        process = Popen(f"node index.js --port {self.port}", shell=True, cwd=current_extension_path)
+        process = Popen(["node", "index.js", "--port", str(self.port)], cwd=current_extension_path)
 
         self.wait_for_launch()
         sleep(1)

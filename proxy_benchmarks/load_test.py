@@ -32,7 +32,7 @@ def run_load_server(port=3010, tls_port=3011):
     :port 3010: host a standard http server
     """
     server_path = get_asset_path("speed-test/server")
-    server_process = Popen(f"go run . --port {port} --tls-port {tls_port}", shell=True, cwd=server_path)
+    server_process = Popen(["go", "run", ".", "--port", str(port), "--tls-port", str(tls_port)], cwd=server_path)
 
     # Wait for the server to spin up
     sleep(2)
@@ -55,8 +55,8 @@ def run_load_test(
 
     env = {
         **environ,
-        "LOAD_TEST_CERTIFICATE": get_asset_path("speed-test/server/cert.crt"),
-        "LOAD_TEST_CERTIFICATE_KEY": get_asset_path("speed-test/server/cert.key"),
+        "LOAD_TEST_CERTIFICATE": get_asset_path("speed-test/server/ssl/cert.crt"),
+        "LOAD_TEST_CERTIFICATE_KEY": get_asset_path("speed-test/server/ssl/cert.key"),
     }
 
     if proxy:
@@ -74,16 +74,14 @@ def run_load_test(
         # Launch the coordination server
         # This will wait to launch until N processes have connected
         main_process = Popen(
-            f"poetry run locust --run-time {run_time_seconds}s --master --expect-workers {spawn_processes} --config={config_path} --host={url}",
-            shell=True,
+            ["poetry", "run", "locust", "--run-time", f"{run_time_seconds}s", "--master", "--expect-workers", str(spawn_processes), f"--config={config_path}", f"--host={url}"],
             cwd=locust_project_path,
             env=env
         )
 
         worker_processes = [
             Popen(
-                f"poetry run locust --worker --config={config_path} --host={url}",
-                shell=True,
+                ["poetry", "run", "locust", "--worker", f"--config={config_path}", f"--host={url}"],
                 cwd=locust_project_path,
                 env=env
             )

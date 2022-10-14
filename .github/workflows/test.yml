@@ -1,0 +1,79 @@
+name: Test package
+
+on:
+  - push
+
+env:
+  IMAGE: piercefreeman/proxy-benchmarks
+  # Update the `run_benchmarking_tests` alongside these tags
+  FINGERPRINT_TAG: "fingerprint"
+  LOAD_TAG: "load"
+  SPEED_TAG: "speed"
+  SSL_TAG: "ssl"
+
+jobs:
+  build:
+    name: Build testing base
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v3
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v3
+        with:
+          file: benchmark.Dockerfile
+          push: true
+          tags: ${{ env.IMAGE }}:${{ github.sha }}
+
+  run_benchmarking_tests:
+    name: Run benchmarking tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Ideally these would be imported from the env variable, but matrix format
+        # doesn't support variable filling
+        tag: [fingerprint, load, speed, ssl]
+    needs: build
+    steps:
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Pull image
+        run: docker pull ${{ env.IMAGE }}:${{ github.sha }}
+
+      - name: Run test
+        run: docker run --cap-add NET_ADMIN ${{ env.IMAGE }}:${{ github.sha }} test -m ${{ matrix.tag }}
+
+  run_remaining:
+    name: Run remaining tests
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Pull image
+        run: docker pull ${{ env.IMAGE }}:${{ github.sha }}
+
+      - name: Run test
+        run:
+          docker run --cap-add NET_ADMIN ${{ env.IMAGE }}:${{ github.sha }} test -m "not ${{ env.FINGERPRINT_TAG }} and not ${{ env.LOAD_TAG }} and not ${{ env.SPEED_TAG }} and not ${{ env.SSL_TAG }}"

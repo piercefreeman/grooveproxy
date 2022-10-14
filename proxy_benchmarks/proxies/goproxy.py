@@ -7,6 +7,7 @@ from proxy_benchmarks.enums import MimicTypeEnum
 from proxy_benchmarks.process import terminate_all
 from proxy_benchmarks.proxies.base import CertificateAuthority, ProxyBase
 
+
 proxy_configurations = {
     MimicTypeEnum.STANDARD: dict(
         project_path="goproxy",
@@ -19,16 +20,19 @@ proxy_configurations = {
 }
 
 class GoProxy(ProxyBase):
-    def __init__(self, proxy_type: MimicTypeEnum):
+    def __init__(self, proxy_type: MimicTypeEnum, verbose: bool = True):
         configuration = proxy_configurations[proxy_type]
 
         super().__init__(port=configuration["port"])
         self.project_path = configuration["project_path"]
+        self.verbose = verbose
 
     @contextmanager
     def launch(self):
         current_extension_path = get_asset_path(f"proxies/{self.project_path}")
-        process = Popen(f"go run . --port {self.port}", shell=True, cwd=current_extension_path)
+        # Disable verbose logging
+        verbose = "false" if self.verbose else "true"
+        process = Popen(["go", "run", ".", "--port", str(self.port), f"-v={verbose}"], cwd=current_extension_path)
 
         # Wait for the proxy to spin up
         self.wait_for_launch()
@@ -47,8 +51,8 @@ class GoProxy(ProxyBase):
     @property
     def certificate_authority(self) -> CertificateAuthority:
         return CertificateAuthority(
-            public=get_asset_path(f"proxies/{self.project_path}/ca.crt"),
-            key=get_asset_path(f"proxies/{self.project_path}/ca.key"),
+            public=get_asset_path(f"proxies/{self.project_path}/ssl/ca.crt"),
+            key=get_asset_path(f"proxies/{self.project_path}/ssl/ca.key"),
         )
 
     @property

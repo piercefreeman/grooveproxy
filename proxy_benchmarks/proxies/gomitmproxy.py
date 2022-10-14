@@ -7,6 +7,7 @@ from proxy_benchmarks.enums import MimicTypeEnum
 from proxy_benchmarks.process import terminate_all
 from proxy_benchmarks.proxies.base import CertificateAuthority, ProxyBase
 
+
 proxy_configurations = {
     MimicTypeEnum.STANDARD: dict(
         project_path="gomitmproxy",
@@ -27,13 +28,8 @@ class GoMitmProxy(ProxyBase):
 
     @contextmanager
     def launch(self):
-        #env = {
-        #    **environ,
-        #    "SSL_CERT_FILE": str(get_asset_path("speed-test/server/cert.crt")),
-        #}
-
         current_extension_path = get_asset_path(f"proxies/{self.project_path}")
-        process = Popen(f"go run . --port {self.port}", shell=True, cwd=current_extension_path)
+        process = Popen(["go", "run", ".", "--port", str(self.port)], cwd=current_extension_path)
 
         self.wait_for_launch()
         # Requires a bit more time to load than our other proxies
@@ -50,8 +46,8 @@ class GoMitmProxy(ProxyBase):
     @property
     def certificate_authority(self) -> CertificateAuthority:
         return CertificateAuthority(
-            public=get_asset_path(f"proxies/{self.project_path}/ca.crt"),
-            key=get_asset_path(f"proxies/{self.project_path}/ca.key"),
+            public=get_asset_path(f"proxies/{self.project_path}/ssl/ca.crt"),
+            key=get_asset_path(f"proxies/{self.project_path}/ssl/ca.key"),
         )
 
     @property

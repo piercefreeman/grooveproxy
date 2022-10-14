@@ -25,6 +25,7 @@ benchmark = "proxy_benchmarks.cli.main:main"
 
 [tool.poetry.group.dev.dependencies]
 isort = "^5.10.1"
+pytest = "^7.1.3"
 
 [build-system]
 requires = ["poetry-core"]
@@ -42,3 +43,11 @@ skip = "__init__.py"
 line_length = 120
 lines_after_imports = 2
 multi_line_output = 3
+
+[tool.pytest]
+markers = """
+    fingerprint: mark a test as a fingerprint test
+    load: mark a test as a load test
+    speed: mark a test as a speed test
+    ssl: mark a test as an ssl test
+"""

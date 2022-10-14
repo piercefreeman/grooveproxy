@@ -1,18 +1,18 @@
-from contextlib import closing, contextmanager
-from csv import DictReader
+from contextlib import contextmanager
 from dataclasses import dataclass, field
-from io import StringIO
 from pathlib import Path
-from socket import AF_INET, SOCK_STREAM, socket
 from subprocess import PIPE, Popen, run
 from tempfile import NamedTemporaryFile
 
 from psutil import net_if_addrs
 
+from proxy_benchmarks.io import is_docker, wrap_command_with_sudo
+from proxy_benchmarks.process import terminate_all
+
 
 def is_socket_bound(port) -> bool:
     # Parse the currently active ports via tabular notation
-    result = run(f"lsof -ti:{port}", shell=True, stdout=PIPE, stderr=PIPE)
+    result = run(["lsof", f"-ti:{port}"], stdout=PIPE, stderr=PIPE)
 
     if result.stdout.decode().strip():
         return True
@@ -21,30 +21,45 @@ def is_socket_bound(port) -> bool:
 
 
 @contextmanager
-def capture_network_traffic(output_path: Path | str, interface: str = "en0"):
+def capture_network_traffic(output_path: Path | str, interface: str | None = None):
     """
     :param interface: BSD network interface name
 
     https://knowledge.broadcom.com/external/article/171081/obtain-a-packet-capture-from-a-mac-compu.html
 
     """
+    if interface is None:
+        # Attempt to intelligently find the right interface
+        if is_docker():
+            interface = "eth0"
+        else:
+            interface = "en0"
+
     allowed_interfaces = list(net_if_addrs().keys())
     if interface not in allowed_interfaces:
         raise ValueError(f"Interface `{interface}` not found in allowed list `{allowed_interfaces}`.")
 
     output_path = Path(output_path).expanduser()
-    process = Popen(f"sudo tcpdump -i {interface} -s 0 -B 524288 -w '{output_path}'", stdout=PIPE, stderr=PIPE, shell=True)
+    print("Will capture traffic...")
+    process = Popen(["tcpdump", "-i", interface, "-s", "0", "-B", "524288", "-w", output_path], stdout=PIPE, stderr=PIPE)
 
     yield
 
-    # We need to kill with sudo permissions, so the `terminate` signal doesn't count
-    run(f"sudo kill {process.pid}", shell=True)
+    # Determine if the process crashed before we've explicitly closed it
+    if process.returncode is not None:
+        raise ValueError(f"Process error: {process.stdout.read().decode()} {process.stderr.read().decode()}")
+
+    print("Close capture...")
+    terminate_all(process)
+    print("Did close capture")
 
     outputs, errors = process.communicate()
+    print("-- Network Capture Outputs --")
     # Additional logging content is written to stderr, so we don't needlessly flag an error here
     for output in [outputs.decode(), errors.decode()]:
         if output.strip():
-            print("Network Outputs", output)
+            print(output)
+    print("-- End Network Capture Outputs --")
 
 
 @dataclass
@@ -138,8 +153,44 @@ class SyntheticHosts:
             for i, host in enumerate(self.hosts)
         }
 
+        if is_docker():
+            self.configure_linux(host_to_ip)
+        else:
+            self.configure_mac(host_to_ip)
+
+        return host_to_ip
+
+
+    def configure_linux(self, host_to_ip: dict[SyntheticHostDefinition, str]):
         for ip_address in host_to_ip.values():
-            run(f"sudo ifconfig lo0 alias {ip_address} up", shell=True)
+            #run(wrap_command_with_sudo(["ip", "lo0", "alias", ip_address, "up"]))
+            # dev (device): lo (ie. loopback)
+            run(wrap_command_with_sudo(["ip", "addr", "add", ip_address, "dev", "lo"]))
+
+        custom_routing = []
+        for host, ip_address in host_to_ip.items():
+            if host.http_port:
+                #iptables -t nat -A PREROUTING -p tcp -d {ip_address} --dport 80 -j REDIRECT --to-port {host.http_port}
+                #iptables -t nat -A OUTPUT -p tcp -d {ip_address} --dport 80 -j REDIRECT --to-port {host.http_port}
+                run(wrap_command_with_sudo(["iptables", "-t", "nat", "-A", "PREROUTING", "-p", "tcp", "-d", ip_address, "--dport", "80", "-j", "REDIRECT", "--to-port", str(host.http_port)]))
+                run(wrap_command_with_sudo(["iptables", "-t", "nat", "-A", "OUTPUT", "-p", "tcp", "-d", ip_address, "--dport", "80", "-j", "REDIRECT", "--to-port", str(host.http_port)]))
+            if host.https_port:
+                #iptables -t nat -A PREROUTING -p tcp -d {ip_address} --dport 443 -j REDIRECT --to-port {host.http_port}
+                #iptables -t nat -A OUTPUT -p tcp -d {ip_address} --dport 443 -j REDIRECT --to-port {host.http_port}
+                run(wrap_command_with_sudo(["iptables", "-t", "nat", "-A", "PREROUTING", "-p", "tcp", "-d", ip_address, "--dport", "443", "-j", "REDIRECT", "--to-port", str(host.https_port)]))
+                run(wrap_command_with_sudo(["iptables", "-t", "nat", "-A", "OUTPUT", "-p", "tcp", "-d", ip_address, "--dport", "443", "-j", "REDIRECT", "--to-port", str(host.https_port)]))
+
+        # USE iproute2
+        # https://askubuntu.com/questions/444124/how-to-add-a-loopback-interface/444128?_gl=1*t9x4hc*_ga*MTg3MDM0NTY2My4xNjYzODMzMzY3*_ga_S812YQPLT2*MTY2NTcxMjI4Ni4xMC4xLjE2NjU3MTMxMDYuMC4wLjA.#444128
+        # https://unix.stackexchange.com/questions/353652/setting-up-a-development-environment-with-iptables
+        # "dev" -> device, ie. adds to the loopback interface
+        # ip addr add 127.0.0.2 dev lo
+        #iptables -t nat -A PREROUTING -p tcp -d 127.0.0.2 --dport 80 -j REDIRECT --to-port 3000
+        #iptables -t nat -A OUTPUT -p tcp -d 127.0.0.2 --dport 80 -j REDIRECT --to-port 3000
+
+    def configure_mac(self, host_to_ip: dict[SyntheticHostDefinition, str]):
+        for ip_address in host_to_ip.values():
+            run(wrap_command_with_sudo(["ifconfig", "lo0", "alias", ip_address, "up"]))
 
         custom_routing = []
         for host, ip_address in host_to_ip.items():
@@ -171,6 +222,6 @@ class SyntheticHosts:
                 new_root_file.flush()
                 new_root_file.seek(0)
 
-                run(f"sudo pfctl -e -f {new_root_file.name}", shell=True)
+                run(wrap_command_with_sudo(["pfctl", "-e", "-f", new_root_file.name]))
 
         return host_to_ip

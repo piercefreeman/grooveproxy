@@ -3,6 +3,8 @@ from abc import ABC, abstractmethod
 from playwright.sync_api import sync_playwright
 from requests import get
 
+from proxy_benchmarks.io import is_docker
+
 
 class RequestBase(ABC):
     @property

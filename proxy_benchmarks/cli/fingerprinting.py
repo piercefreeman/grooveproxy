@@ -141,20 +141,14 @@ def compare(obj, file: list[str]):
 
 
 @fingerprint.command()
+@option("--runner", default="chrome-headfull", type=str, required=False)
 @option("--proxy", multiple=True)
 @pass_obj
-def compare_dynamic(obj, proxy: list[str]):
+def compare_dynamic(obj, runner: str, proxy: list[str]):
     """
     Compare a proxy server dynamically. Integrated execution and comparison.
 
     """
-    console = obj["console"]
-    divider = obj["divider"]
-
-    # Ensure we have sudo permissions
-    print("proxy-benchmarks needs to capture network traffic...")
-    run(f"sudo echo 'Confirmation success...\n'", shell=True)
-
     supported_proxies = {
         "gomitmproxy": GoMitmProxy(MimicTypeEnum.STANDARD),
         "gomitmproxy-mimic": GoMitmProxy(MimicTypeEnum.MIMIC),
@@ -162,17 +156,35 @@ def compare_dynamic(obj, proxy: list[str]):
         "goproxy-mimic": GoProxy(MimicTypeEnum.MIMIC),
     }
 
+    supported_runners = {
+        "chrome-headfull": ChromeRequest(headless=False),
+        "chrome-headless": ChromeRequest(headless=True),
+    }
+
     proxies = [
         supported_proxies[proxy_name]
         for proxy_name in proxy
     ]
 
-    runner = ChromeRequest(headless=False)
+    runner = supported_runners[runner]
+
+    compare_dynamic_raw(obj, runner, proxies)
+
+
+def compare_dynamic_raw(obj, runner: RequestBase, proxies: list[ProxyBase]):
+    console = obj["console"]
+    divider = obj["divider"]
+
+    # Ensure we have sudo permissions
+    print("proxy-benchmarks needs to capture network traffic...")
+    run(f"sudo echo 'Confirmation success...\n'", shell=True)
 
     # Proxy -> Path
     fingerprint_paths = {}
 
     with TemporaryDirectory() as temp_dir:
+        # Baseline fingerprint
+        console.print(f"{divider}\nFingerprinting baseline\n{divider}", style="bold blue")
         no_proxy_path = Path(temp_dir) / "no_proxy.pcap"
         get_fingerprint(
             TEST_TCP_URL,
@@ -184,7 +196,10 @@ def compare_dynamic(obj, proxy: list[str]):
         )
         fingerprint_paths["no-proxy"] = no_proxy_path
 
+        # Proxy specific fingerprints
         for proxy in proxies:
+            console.print(f"{divider}\nFingerprinting proxy `{proxy}`\n{divider}", style="bold blue")
+
             proxy_path = Path(temp_dir) / f"{proxy.short_name}-proxy.pcap"
             with proxy.launch():
                 get_fingerprint(

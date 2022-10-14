@@ -41,7 +41,7 @@ func main() {
 
 	go func() {
 		// generate a `Certificate` struct
-		cert, _ := tls.LoadX509KeyPair("cert.crt", "cert.key")
+		cert, _ := tls.LoadX509KeyPair("ssl/cert.crt", "ssl/cert.key")
 
 		// create a custom server with `TLSConfig`
 		s := &http.Server{
