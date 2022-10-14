@@ -28,11 +28,6 @@ class GoMitmProxy(ProxyBase):
 
     @contextmanager
     def launch(self):
-        #env = {
-        #    **environ,
-        #    "SSL_CERT_FILE": str(get_asset_path("speed-test/server/cert.crt")),
-        #}
-
         current_extension_path = get_asset_path(f"proxies/{self.project_path}")
         process = Popen(["go", "run", ".", "--port", str(self.port)], cwd=current_extension_path)
 

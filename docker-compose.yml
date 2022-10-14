@@ -5,6 +5,9 @@ services:
     build:
       context: .
       dockerfile: benchmark.Dockerfile
+    cap_add:
+      # Required for synthetic 127.0.0.2 ports
+      - NET_ADMIN
     volumes:
       - ./proxy_benchmarks:/app/proxy_benchmarks
       # ignore the ssl files since these are separately generated in the docker image

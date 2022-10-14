@@ -6,7 +6,7 @@ from tempfile import NamedTemporaryFile
 
 from psutil import net_if_addrs
 
-from proxy_benchmarks.io import wrap_command_with_sudo
+from proxy_benchmarks.io import is_docker, wrap_command_with_sudo
 from proxy_benchmarks.process import terminate_all
 
 
@@ -152,6 +152,42 @@ class SyntheticHosts:
             for i, host in enumerate(self.hosts)
         }
 
+        if is_docker():
+            self.configure_linux(host_to_ip)
+        else:
+            self.configure_mac(host_to_ip)
+
+        return host_to_ip
+
+
+    def configure_linux(self, host_to_ip: dict[SyntheticHostDefinition, str]):
+        for ip_address in host_to_ip.values():
+            #run(wrap_command_with_sudo(["ip", "lo0", "alias", ip_address, "up"]))
+            # dev (device): lo (ie. loopback)
+            run(wrap_command_with_sudo(["ip", "addr", "add", ip_address, "dev", "lo"]))
+
+        custom_routing = []
+        for host, ip_address in host_to_ip.items():
+            if host.http_port:
+                #iptables -t nat -A PREROUTING -p tcp -d {ip_address} --dport 80 -j REDIRECT --to-port {host.http_port}
+                #iptables -t nat -A OUTPUT -p tcp -d {ip_address} --dport 80 -j REDIRECT --to-port {host.http_port}
+                run(wrap_command_with_sudo(["iptables", "-t", "nat", "-A", "PREROUTING", "-p", "tcp", "-d", ip_address, "--dport", "80", "-j", "REDIRECT", "--to-port", str(host.http_port)]))
+                run(wrap_command_with_sudo(["iptables", "-t", "nat", "-A", "OUTPUT", "-p", "tcp", "-d", ip_address, "--dport", "80", "-j", "REDIRECT", "--to-port", str(host.http_port)]))
+            if host.https_port:
+                #iptables -t nat -A PREROUTING -p tcp -d {ip_address} --dport 443 -j REDIRECT --to-port {host.http_port}
+                #iptables -t nat -A OUTPUT -p tcp -d {ip_address} --dport 443 -j REDIRECT --to-port {host.http_port}
+                run(wrap_command_with_sudo(["iptables", "-t", "nat", "-A", "PREROUTING", "-p", "tcp", "-d", ip_address, "--dport", "443", "-j", "REDIRECT", "--to-port", str(host.https_port)]))
+                run(wrap_command_with_sudo(["iptables", "-t", "nat", "-A", "OUTPUT", "-p", "tcp", "-d", ip_address, "--dport", "443", "-j", "REDIRECT", "--to-port", str(host.https_port)]))
+
+        # USE iproute2
+        # https://askubuntu.com/questions/444124/how-to-add-a-loopback-interface/444128?_gl=1*t9x4hc*_ga*MTg3MDM0NTY2My4xNjYzODMzMzY3*_ga_S812YQPLT2*MTY2NTcxMjI4Ni4xMC4xLjE2NjU3MTMxMDYuMC4wLjA.#444128
+        # https://unix.stackexchange.com/questions/353652/setting-up-a-development-environment-with-iptables
+        # "dev" -> device, ie. adds to the loopback interface
+        # ip addr add 127.0.0.2 dev lo
+        #iptables -t nat -A PREROUTING -p tcp -d 127.0.0.2 --dport 80 -j REDIRECT --to-port 3000
+        #iptables -t nat -A OUTPUT -p tcp -d 127.0.0.2 --dport 80 -j REDIRECT --to-port 3000
+
+    def configure_mac(self, host_to_ip: dict[SyntheticHostDefinition, str]):
         for ip_address in host_to_ip.values():
             run(wrap_command_with_sudo(["ifconfig", "lo0", "alias", ip_address, "up"]))
 

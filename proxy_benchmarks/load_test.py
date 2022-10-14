@@ -55,8 +55,8 @@ def run_load_test(
 
     env = {
         **environ,
-        "LOAD_TEST_CERTIFICATE": get_asset_path("speed-test/server/cert.crt"),
-        "LOAD_TEST_CERTIFICATE_KEY": get_asset_path("speed-test/server/cert.key"),
+        "LOAD_TEST_CERTIFICATE": get_asset_path("speed-test/server/ssl/cert.crt"),
+        "LOAD_TEST_CERTIFICATE_KEY": get_asset_path("speed-test/server/ssl/cert.key"),
     }
 
     if proxy:

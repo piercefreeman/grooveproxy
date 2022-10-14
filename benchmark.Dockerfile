@@ -6,7 +6,7 @@ ENV NODE_VERSION v16.14.0
 ENV NVM_DIR /usr/local/nvm
 
 RUN apt-get -y update \
-    && apt-get -y install python3 python3.10-venv curl gcc python3-dev sudo ca-certificates tcpdump golang-go git lsof software-properties-common
+    && apt-get -y install python3 python3.10-venv curl gcc python3-dev sudo ca-certificates tcpdump golang-go git lsof software-properties-common iproute2 iptables
 
 RUN sudo add-apt-repository -y ppa:wireshark-dev/stable \
     && sudo apt-get -y update \
@@ -49,10 +49,5 @@ RUN ./setup.sh
 
 RUN poetry run playwright install-deps chromium
 RUN poetry run playwright install chromium
-
-#RUN useradd -m docker && echo "docker:docker" | chpasswd && adduser docker sudo
-#RUN adduser docker && usermod -aG sudo docker
-
-#USER docker
 
 ENTRYPOINT [ "/app/benchmark_entrypoint.sh" ]
