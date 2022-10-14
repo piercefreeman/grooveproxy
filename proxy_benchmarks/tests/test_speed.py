@@ -12,6 +12,7 @@ from proxy_benchmarks.proxies.node_http_proxy import NodeHttpProxy
 from pathlib import Path
 
 
+@pytest.mark.speed
 @pytest.mark.parametrize(
     "proxy",
     [
@@ -34,6 +35,7 @@ def test_speed_simple(cli_object, proxy):
             proxies=[proxy],
         )
 
+@pytest.mark.speed
 @pytest.mark.xfail(reason="crash because of http/2 protocol")
 @pytest.mark.parametrize(
     "proxy",

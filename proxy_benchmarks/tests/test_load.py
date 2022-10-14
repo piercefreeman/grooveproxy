@@ -12,6 +12,7 @@ from proxy_benchmarks.proxies.mitmproxy import MitmProxy
 from proxy_benchmarks.proxies.node_http_proxy import NodeHttpProxy
 
 
+@pytest.mark.load
 @pytest.mark.parametrize(
     "proxy",
     [

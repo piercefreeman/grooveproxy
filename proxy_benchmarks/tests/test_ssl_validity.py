@@ -10,6 +10,7 @@ from proxy_benchmarks.proxies.node_http_proxy import NodeHttpProxy
 from proxy_benchmarks.requests import ChromeRequest
 
 
+@pytest.mark.ssl
 @pytest.mark.parametrize(
     "proxy",
     [

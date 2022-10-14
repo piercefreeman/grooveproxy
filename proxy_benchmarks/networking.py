@@ -21,24 +21,27 @@ def is_socket_bound(port) -> bool:
 
 
 @contextmanager
-#def capture_network_traffic(output_path: Path | str, interface: str = "en0"):
-def capture_network_traffic(output_path: Path | str, interface: str = "eth0"):
-    #  `['lo', 'eth0', 'tunl0', 'ip6tnl0']`.
+def capture_network_traffic(output_path: Path | str, interface: str | None = None):
     """
     :param interface: BSD network interface name
 
     https://knowledge.broadcom.com/external/article/171081/obtain-a-packet-capture-from-a-mac-compu.html
 
     """
+    if interface is None:
+        # Attempt to intelligently find the right interface
+        if is_docker():
+            interface = "eth0"
+        else:
+            interface = "en0"
+
     allowed_interfaces = list(net_if_addrs().keys())
     if interface not in allowed_interfaces:
         raise ValueError(f"Interface `{interface}` not found in allowed list `{allowed_interfaces}`.")
 
     output_path = Path(output_path).expanduser()
-    #process = Popen(f"sudo tcpdump -i {interface} -s 0 -B 524288 -w '{output_path}'", stdout=PIPE, stderr=PIPE, shell=True)
-    #process = Popen(f"tcpdump -i {interface} -s 0 -B 524288 -w '{output_path}'", stdout=PIPE, stderr=PIPE, shell=True)
     print("Will capture traffic...")
-    process = Popen(wrap_command_with_sudo(["tcpdump", "-i", interface, "-s", "0", "-B", "524288", "-w", output_path]), stdout=PIPE, stderr=PIPE)
+    process = Popen(["tcpdump", "-i", interface, "-s", "0", "-B", "524288", "-w", output_path], stdout=PIPE, stderr=PIPE)
 
     yield
 
@@ -46,8 +49,6 @@ def capture_network_traffic(output_path: Path | str, interface: str = "eth0"):
     if process.returncode is not None:
         raise ValueError(f"Process error: {process.stdout.read().decode()} {process.stderr.read().decode()}")
 
-    # We need to kill with sudo permissions, so the `terminate` signal doesn't count
-    #run(wrap_command_with_sudo([f"kill", f"{process.pid}"]))
     print("Close capture...")
     terminate_all(process)
     print("Did close capture")
