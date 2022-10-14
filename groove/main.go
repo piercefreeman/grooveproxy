@@ -58,6 +58,16 @@ func main() {
 		})
 	})
 
+	r.GET("/api/tape/retrieve", func(c *gin.Context) {
+		response, err := recorder.ExportData()
+		if err != nil {
+			c.Status(http.StatusServiceUnavailable)
+			return
+		}
+
+		c.Data(http.StatusOK, "application/x-gzip", response.Bytes())
+	})
+
 	var (
 		verbose = flag.Bool("v", true, "should every proxy request be logged to stdout")
 		port    = flag.Int("port", 6010, "proxy http listen address")
@@ -93,40 +103,14 @@ func main() {
 		proxy.ServeHTTP(w, req)
 	})
 
-	/*proxy.OnRequest().DoFunc(
-		// Request logger
-		func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
-			// TODO: Bail if `RecorderModeOff`
-
-			body, err := io.ReadAll(r.Body)
-
-			if err != nil {
-				log.Println("Unable to read body stream")
-				return r, nil
-			}
-			r.Body = ioutil.NopCloser(bytes.NewReader(body))
-
-			log.Println("Add record log.")
-			recorder.requests = append(
-				recorder.requests,
-				&RecordedRecord{
-					request: ArchivedRequest{
-						url:     r.Host,
-						method:  r.Method,
-						headers: r.Header,
-						body:    body,
-						order:   0,
-					},
-				},
-			)
-
-			return r, nil
-		},
-	)*/
-
 	proxy.OnResponse().DoFunc(
 		func(response *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
-			log.Println("handle response...")
+			// Only handle responses during write mode
+			if recorder.mode != RecorderModeWrite {
+				return response
+			}
+
+			log.Println("Record request/response...")
 			requestHistory, responseHistory := getRedirectHistory(response)
 
 			// When replaying this we want to replay it in order to capture all the
@@ -135,8 +119,8 @@ func main() {
 				request := requestHistory[i]
 				response := responseHistory[i]
 
-				log.Println("Add record log.")
 				recorder.LogPair(request, response)
+				log.Println("Added record log.")
 			}
 
 			return response

@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
+	"encoding/json"
 	"io"
 	"io/ioutil"
 	"log"
@@ -9,10 +11,10 @@ import (
 )
 
 type ArchivedRequest struct {
-	url     string
-	method  string
-	headers map[string][]string
-	body    []byte
+	Url     string
+	Method  string
+	Headers map[string][]string
+	Body    []byte
 
 	// Order that the request was issued; expected to be FIFO
 	// Allows requests with the same parameters to return in the correct order
@@ -24,9 +26,9 @@ type ArchivedResponse struct {
 	// and will return a "Location" redirect prompt in the headers here.
 	/// response metadata
 	//redirected bool
-	status  int
-	headers map[string][]string
-	body    []byte
+	Status  int
+	Headers map[string][]string
+	Body    []byte
 }
 
 const (
@@ -36,8 +38,8 @@ const (
 )
 
 type RecordedRecord struct {
-	request  ArchivedRequest
-	response ArchivedResponse
+	Request  ArchivedRequest
+	Response ArchivedResponse
 	//inflightMilliseconds int
 }
 
@@ -48,7 +50,9 @@ type Recorder struct {
 
 func NewRecorder() *Recorder {
 	return &Recorder{
-		mode:     RecorderModeOff,
+		//mode:     RecorderModeOff,
+		// TODO: Restore default
+		mode:     RecorderModeWrite,
 		requests: make([]*RecordedRecord, 0),
 	}
 }
@@ -69,20 +73,40 @@ func (r *Recorder) LogPair(request *http.Request, response *http.Response) {
 	r.requests = append(
 		r.requests,
 		&RecordedRecord{
-			request: ArchivedRequest{
+			Request: ArchivedRequest{
 				// last url accessed - how do we get the first
-				url:     request.URL.String(),
-				method:  request.Method,
-				headers: request.Header,
-				body:    requestBody,
+				Url:     request.URL.String(),
+				Method:  request.Method,
+				Headers: request.Header,
+				Body:    requestBody,
 			},
-			response: ArchivedResponse{
-				status:  response.StatusCode,
-				headers: response.Header,
-				body:    responseBody,
+			Response: ArchivedResponse{
+				Status:  response.StatusCode,
+				Headers: response.Header,
+				Body:    responseBody,
 			},
 		},
 	)
+}
+
+func (r *Recorder) ExportData() (response *bytes.Buffer, err error) {
+	/*
+	 * Formats data in a readable payload, gzipped for space savings
+	 */
+	log.Printf("Total requests: %d", len(r.requests))
+	json, err := json.Marshal(r.requests)
+
+	if err != nil {
+		log.Println("Unable to export json payload")
+		return nil, err
+	}
+
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	gz.Write(json)
+	gz.Close()
+
+	return &buf, nil
 }
 
 func (r *Recorder) Print() {
@@ -90,6 +114,6 @@ func (r *Recorder) Print() {
 
 	for i := 0; i < len(r.requests); i++ {
 		record := r.requests[i]
-		log.Printf("Request archive: %s %s (response size: %d)\n", record.request.url, record.request.method, len(record.response.body))
+		log.Printf("Request archive: %s %s (response size: %d)\n", record.Request.Url, record.Request.Method, len(record.Response.Body))
 	}
 }
