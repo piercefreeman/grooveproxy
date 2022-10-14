@@ -20,16 +20,19 @@ proxy_configurations = {
 }
 
 class GoProxy(ProxyBase):
-    def __init__(self, proxy_type: MimicTypeEnum):
+    def __init__(self, proxy_type: MimicTypeEnum, verbose: bool = True):
         configuration = proxy_configurations[proxy_type]
 
         super().__init__(port=configuration["port"])
         self.project_path = configuration["project_path"]
+        self.verbose = verbose
 
     @contextmanager
     def launch(self):
         current_extension_path = get_asset_path(f"proxies/{self.project_path}")
-        process = Popen(["go", "run", ".", "--port", str(self.port)], cwd=current_extension_path)
+        # Disable verbose logging
+        verbose = "false" if self.verbose else "true"
+        process = Popen(["go", "run", ".", "--port", str(self.port), f"-v={verbose}"], cwd=current_extension_path)
 
         # Wait for the proxy to spin up
         self.wait_for_launch()

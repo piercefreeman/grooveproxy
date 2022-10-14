@@ -30,6 +30,8 @@ func main() {
 	)
 	flag.Parse()
 
+	log.Printf("Verbose: %v", *verbose)
+
 	// Set our own CA instead of the one that's default bundled with the proxy
 	setCA("ssl/ca.crt", "ssl/ca.key")
 

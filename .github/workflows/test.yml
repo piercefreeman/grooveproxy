@@ -1,0 +1,25 @@
+name: Test package
+
+on:
+  - push
+
+jobs:
+  run_tests:
+    name: Run tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v3
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build docker
+        run: docker build -t benchmark -f benchmark.Dockerfile .
+
+      - name: Run test
+        run: docker run --cap-add NET_ADMIN benchmark:latest test

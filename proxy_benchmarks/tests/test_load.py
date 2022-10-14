@@ -16,12 +16,12 @@ from proxy_benchmarks.proxies.node_http_proxy import NodeHttpProxy
     "proxy",
     [
         GoProxy(MimicTypeEnum.STANDARD),
-        #GoProxy(MimicTypeEnum.MIMIC),
-        #GoMitmProxy(MimicTypeEnum.STANDARD),
-        #GoMitmProxy(MimicTypeEnum.MIMIC),
-        #MartianProxy(),
-        #MitmProxy(),
-        #NodeHttpProxy(),
+        GoProxy(MimicTypeEnum.MIMIC),
+        GoMitmProxy(MimicTypeEnum.STANDARD),
+        GoMitmProxy(MimicTypeEnum.MIMIC),
+        MartianProxy(),
+        MitmProxy(),
+        NodeHttpProxy(),
     ],
 )
 def test_load_simple(cli_object, proxy):
@@ -33,7 +33,7 @@ def test_load_simple(cli_object, proxy):
             cli_object,
             output_path=directory,
             runtime_seconds=5,
-            proxies=[proxy],
+            proxies=[None, proxy],
         )
 
         # Now analyze
@@ -46,7 +46,7 @@ def test_load_simple(cli_object, proxy):
         proxy_https_failure = df[(df.proxy == proxy.short_name) & (df.protocol == "https")]["Failure Count"].iloc[0]
 
         # Under this shallow load we shouldn't see any errors
-        assert baseline_http_failure == 0
-        assert baseline_https_failure == 0
-        assert proxy_http_failure == 0
-        assert proxy_https_failure == 0
+        assert baseline_http_failure == "0"
+        assert baseline_https_failure == "0"
+        assert proxy_http_failure == "0"
+        assert proxy_https_failure == "0"

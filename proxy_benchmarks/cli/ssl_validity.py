@@ -9,11 +9,11 @@ from proxy_benchmarks.proxies.goproxy import GoProxy
 from proxy_benchmarks.proxies.martian import MartianProxy
 from proxy_benchmarks.proxies.mitmproxy import MitmProxy
 from proxy_benchmarks.proxies.node_http_proxy import NodeHttpProxy
-from proxy_benchmarks.requests import ChromeRequest
+from proxy_benchmarks.requests import ChromeRequest, RequestBase
 
 
 @command()
-@option("--inspect-browser", is_flag=True, default=False)
+@option("--inspect-browser", is_flag=True, default=True)
 @pass_obj
 def basic_ssl_test(obj, inspect_browser: bool):
     """
@@ -34,14 +34,13 @@ def basic_ssl_test(obj, inspect_browser: bool):
         MartianProxy(),
     ]
 
-    execute_raw(inspect_browser, proxies)
+    request = ChromeRequest(headless=False, keep_open=inspect_browser)
+    execute_raw(obj, inspect_browser, request, proxies)
 
 
-def execute_raw(obj, inspect_browser: bool, proxies: list[ProxyBase]):
+def execute_raw(obj, inspect_browser: bool, request: RequestBase, proxies: list[ProxyBase]):
     console = obj["console"]
     divider = obj["divider"]
-
-    request = ChromeRequest(headless=False, keep_open=inspect_browser)
 
     with run_load_server() as load_server_definition:
         synthetic_ip_addresses = SyntheticHosts(
