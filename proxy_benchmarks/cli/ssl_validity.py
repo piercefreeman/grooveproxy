@@ -13,9 +13,9 @@ from proxy_benchmarks.requests import ChromeRequest
 
 
 @command()
-@option("--inspect-commands", is_flag=True)
+@option("--inspect-browser", is_flag=True, default=False)
 @pass_obj
-def basic_ssl_test(obj, inspect_browser: bool, default=False):
+def basic_ssl_test(obj, inspect_browser: bool):
     """
     Walk through the different proxy servers and test their SSL validity separately.
     
@@ -24,9 +24,6 @@ def basic_ssl_test(obj, inspect_browser: bool, default=False):
     and debugging console.
 
     """
-    console = obj["console"]
-    divider = obj["divider"]
-
     proxies: list[ProxyBase] = [
         GoProxy(MimicTypeEnum.STANDARD),
         GoProxy(MimicTypeEnum.MIMIC),
@@ -36,6 +33,13 @@ def basic_ssl_test(obj, inspect_browser: bool, default=False):
         GoMitmProxy(MimicTypeEnum.MIMIC),
         MartianProxy(),
     ]
+
+    execute_raw(inspect_browser, proxies)
+
+
+def execute_raw(obj, inspect_browser: bool, proxies: list[ProxyBase]):
+    console = obj["console"]
+    divider = obj["divider"]
 
     request = ChromeRequest(headless=False, keep_open=inspect_browser)
 

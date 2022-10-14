@@ -32,6 +32,9 @@ def load_test():
 @option("--runtime-seconds", type=int, default=60)
 @pass_obj
 def execute(obj, data_path, runtime_seconds):
+    output_path = Path(data_path).expanduser()
+    output_path.mkdir(exist_ok=True)
+
     proxies: list[ProxyBase] = [
         GoMitmProxy(MimicTypeEnum.STANDARD),
         GoMitmProxy(MimicTypeEnum.MIMIC),
@@ -63,33 +66,13 @@ def analyze(data_path, output_filename):
         GoProxy(MimicTypeEnum.MIMIC),
     ]
 
-    dataframes = []
-
-    for proxy in proxies:
-        short_name = proxy.short_name if proxy else "baseline"
-
-        for protocol in ["http", "https"]:
-            with open(data_path / f"{short_name}_{protocol}.json") as file:
-                payload = load(file)
-                dataframes.append(
-                    pd.DataFrame(payload["stats"]).assign(
-                        proxy=short_name,
-                        protocol=protocol,
-                    )
-                )
-
-    df = pd.concat(dataframes)
-    df = df[df["Name"] == "/handle"]
-
+    df = analyze_raw(data_path, proxies)
     df.to_csv(output_filename)
 
 
-def execute_raw(obj, data_path: str | Path, runtime_seconds: int, proxies: list[ProxyBase]):
+def execute_raw(obj, output_path: Path, runtime_seconds: int, proxies: list[ProxyBase]):
     console = obj["console"]
     divider = obj["divider"]
-
-    output_path = Path(data_path).expanduser()
-    output_path.mkdir(exist_ok=True)
 
     load_http_port = 3010
     load_https_port = 3011
@@ -131,6 +114,26 @@ def execute_raw(obj, data_path: str | Path, runtime_seconds: int, proxies: list[
                 finalize_results(output_path, proxy.short_name, http_baseline_results, https_baseline_results)
 
             console.print(f"Load test with {proxy} completed...")
+
+
+def analyze_raw(data_path: Path | str, proxies: list[ProxyBase]) -> pd.DataFrame:
+    dataframes = []
+
+    for proxy in proxies:
+        short_name = proxy.short_name if proxy else "baseline"
+
+        for protocol in ["http", "https"]:
+            with open(data_path / f"{short_name}_{protocol}.json") as file:
+                payload = load(file)
+                dataframes.append(
+                    pd.DataFrame(payload["stats"]).assign(
+                        proxy=short_name,
+                        protocol=protocol,
+                    )
+                )
+
+    df = pd.concat(dataframes)
+    return df[df["Name"] == "/handle"]
 
 
 def finalize_results(

@@ -37,12 +37,6 @@ def execute(obj, samples, data_path):
     Benchmark speed of certificate generation.
 
     """
-    console = obj["console"]
-    divider = obj["divider"]
-
-    data_path = Path(data_path).expanduser()
-    data_path.mkdir(exist_ok=True)
-
     proxies: list[ProxyBase] = [
         MitmProxy(),
         NodeHttpProxy(),
@@ -50,6 +44,16 @@ def execute(obj, samples, data_path):
         MartianProxy(),
         GoProxy(MimicTypeEnum.STANDARD),
     ]
+
+    execute_raw(obj, samples, data_path, proxies)
+
+
+def execute_raw(obj, samples: int, data_path: str | Path, proxies: list[ProxyBase]):
+    console = obj["console"]
+    divider = obj["divider"]
+
+    data_path = Path(data_path).expanduser()
+    data_path.mkdir(exist_ok=True)
 
     proxy_samples = []
 
@@ -114,7 +118,7 @@ def execute(obj, samples, data_path):
 
 @speed_test.command()
 @option("--data-path", type=ClickPath(dir_okay=True, file_okay=False), required=True)
-def analyze_2(data_path):
+def analyze(data_path):
     data_path = Path(data_path).expanduser()
 
     df = pd.read_json(data_path / "raw.json")
