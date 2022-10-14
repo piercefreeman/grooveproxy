@@ -24,9 +24,35 @@ func orPanic(err error) {
 	}
 }
 
+func getRedirectHistory(response *http.Response) ([]*http.Request, []*http.Response) {
+	// The eventually resolved response payload carries alongside all of the request
+	// history - this function reassembles it
+	requestHistory := make([]*http.Request, 0)
+	responseHistory := make([]*http.Response, 0)
+
+	for response != nil {
+		request := response.Request
+		requestHistory = append(requestHistory, request)
+		responseHistory = append(responseHistory, response)
+		response = request.Response
+	}
+
+	// The response order is actually reversed from what we expect
+	// The last request that eventually made the response comes first in the slice
+	reverseSlice(requestHistory)
+	reverseSlice(responseHistory)
+
+	return requestHistory, responseHistory
+}
+
 func main() {
+	recorder := NewRecorder()
+
 	r := gin.Default()
-	r.GET("/ping", func(c *gin.Context) {
+	r.GET("/api/tape/record", func(c *gin.Context) {
+		// Start to record the requests
+		recorder.Print()
+
 		c.JSON(http.StatusOK, gin.H{
 			"message": "pong",
 		})
@@ -66,8 +92,61 @@ func main() {
 		req.URL.Host = req.Host
 		proxy.ServeHTTP(w, req)
 	})
+
+	/*proxy.OnRequest().DoFunc(
+		// Request logger
+		func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
+			// TODO: Bail if `RecorderModeOff`
+
+			body, err := io.ReadAll(r.Body)
+
+			if err != nil {
+				log.Println("Unable to read body stream")
+				return r, nil
+			}
+			r.Body = ioutil.NopCloser(bytes.NewReader(body))
+
+			log.Println("Add record log.")
+			recorder.requests = append(
+				recorder.requests,
+				&RecordedRecord{
+					request: ArchivedRequest{
+						url:     r.Host,
+						method:  r.Method,
+						headers: r.Header,
+						body:    body,
+						order:   0,
+					},
+				},
+			)
+
+			return r, nil
+		},
+	)*/
+
+	proxy.OnResponse().DoFunc(
+		func(response *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
+			log.Println("handle response...")
+			requestHistory, responseHistory := getRedirectHistory(response)
+
+			// When replaying this we want to replay it in order to capture all the
+			// event history and test redirect handlers
+			for i := 0; i < len(requestHistory); i++ {
+				request := requestHistory[i]
+				response := responseHistory[i]
+
+				log.Println("Add record log.")
+				recorder.LogPair(request, response)
+			}
+
+			return response
+		},
+	)
+
 	proxy.OnRequest(goproxy.ReqHostMatches(regexp.MustCompile("^.*$"))).
 		HandleConnect(goproxy.AlwaysMitm)
+
+	// https://github.com/elazarl/goproxy/blob/master/examples/goproxy-eavesdropper/main.go
 	proxy.OnRequest(goproxy.ReqHostMatches(regexp.MustCompile("^.*:80$"))).
 		HijackConnect(func(req *http.Request, client net.Conn, ctx *goproxy.ProxyCtx) {
 			defer func() {
