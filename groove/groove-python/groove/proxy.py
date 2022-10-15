@@ -5,6 +5,14 @@ from json import loads, dumps
 from base64 import b64decode, b64encode
 from requests import Session
 from urllib.parse import urljoin
+from enum import Enum
+
+
+class CacheModeEnum(Enum):
+    # Ensure enum values are aligned with the cache.go definitions
+    OFF = 0
+    STANDARD = 1
+    AGGRESSIVE = 2
 
 
 class TapeRequest(BaseModel):
@@ -86,4 +94,13 @@ class Groove:
 
     def tape_stop(self):
         response = self.session.post(urljoin(self.base_url_control, "/api/tape/stop"), timeout=self.timeout)
+        assert response.json()["success"] == True
+
+    def set_cache_mode(self, mode: CacheModeEnum):
+        response = self.session.post(
+            urljoin(self.base_url_control, "/api/cache/mode"),
+            json=dict(
+                mode=mode.value,
+            )
+        )
         assert response.json()["success"] == True
