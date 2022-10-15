@@ -49,16 +49,26 @@ func main() {
 	recorder := NewRecorder()
 
 	r := gin.Default()
-	r.GET("/api/tape/record", func(c *gin.Context) {
+	r.POST("/api/tape/record", func(c *gin.Context) {
 		// Start to record the requests
-		recorder.Print()
+		recorder.mode = RecorderModeWrite
+		recorder.requests = nil
 
 		c.JSON(http.StatusOK, gin.H{
-			"message": "pong",
+			"success": true,
 		})
 	})
 
-	r.GET("/api/tape/retrieve", func(c *gin.Context) {
+	r.POST("/api/tape/stop", func(c *gin.Context) {
+		// Start to record the requests
+		recorder.mode = RecorderModeOff
+
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+		})
+	})
+
+	r.POST("/api/tape/retrieve", func(c *gin.Context) {
 		response, err := recorder.ExportData()
 		if err != nil {
 			c.Status(http.StatusServiceUnavailable)
@@ -68,9 +78,26 @@ func main() {
 		c.Data(http.StatusOK, "application/x-gzip", response.Bytes())
 	})
 
+	r.POST("/api/tape/load", func(c *gin.Context) {
+		recorder.mode = RecorderModeRead
+		file, _ := c.FormFile("file")
+
+		fileHandler, err := file.Open()
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		recorder.LoadData(fileHandler)
+
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+		})
+	})
+
 	var (
-		verbose = flag.Bool("v", true, "should every proxy request be logged to stdout")
-		port    = flag.Int("port", 6010, "proxy http listen address")
+		verbose     = flag.Bool("v", true, "should every proxy request be logged to stdout")
+		port        = flag.Int("port", 6010, "proxy http listen address")
+		controlPort = flag.Int("control-port", 5010, "control API listen address")
 	)
 	flag.Parse()
 
@@ -103,7 +130,29 @@ func main() {
 		proxy.ServeHTTP(w, req)
 	})
 
+	proxy.OnRequest().DoFunc(
+		func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
+			// Only handle responses during write mode
+			if recorder.mode != RecorderModeRead {
+				return r, nil
+			}
+
+			recordResult := recorder.FindMatchingResponse(r)
+
+			if recordResult != nil {
+				log.Printf("Record found: %s\n", r.URL.String())
+				return r, recordResult
+			} else {
+				log.Printf("No matching record found: %s\n", r.URL.String())
+			}
+
+			return r, nil
+		})
+
 	proxy.OnResponse().DoFunc(
+		/*
+		 * Recorder
+		 */
 		func(response *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
 			// Only handle responses during write mode
 			if recorder.mode != RecorderModeWrite {
@@ -158,7 +207,7 @@ func main() {
 		})
 
 	go func() {
-		r.Run(":5010")
+		r.Run(":" + strconv.Itoa(*controlPort))
 	}()
 
 	go func() {
