@@ -14,7 +14,6 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/gin-gonic/gin"
 	"github.com/piercefreeman/goproxy"
 )
 
@@ -48,52 +47,6 @@ func getRedirectHistory(response *http.Response) ([]*http.Request, []*http.Respo
 func main() {
 	recorder := NewRecorder()
 
-	r := gin.Default()
-	r.POST("/api/tape/record", func(c *gin.Context) {
-		// Start to record the requests, nullifying any ones from an old session
-		recorder.mode = RecorderModeWrite
-		recorder.records = nil
-
-		c.JSON(http.StatusOK, gin.H{
-			"success": true,
-		})
-	})
-
-	r.POST("/api/tape/stop", func(c *gin.Context) {
-		// Start to record the requests
-		recorder.mode = RecorderModeOff
-
-		c.JSON(http.StatusOK, gin.H{
-			"success": true,
-		})
-	})
-
-	r.POST("/api/tape/retrieve", func(c *gin.Context) {
-		response, err := recorder.ExportData()
-		if err != nil {
-			c.Status(http.StatusServiceUnavailable)
-			return
-		}
-
-		c.Data(http.StatusOK, "application/x-gzip", response.Bytes())
-	})
-
-	r.POST("/api/tape/load", func(c *gin.Context) {
-		recorder.mode = RecorderModeRead
-		file, _ := c.FormFile("file")
-
-		fileHandler, err := file.Open()
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		recorder.LoadData(fileHandler)
-
-		c.JSON(http.StatusOK, gin.H{
-			"success": true,
-		})
-	})
-
 	var (
 		verbose     = flag.Bool("v", true, "should every proxy request be logged to stdout")
 		port        = flag.Int("port", 6010, "proxy http listen address")
@@ -105,6 +58,8 @@ func main() {
 
 	// Set our own CA instead of the one that's default bundled with the proxy
 	setCA("ssl/ca.crt", "ssl/ca.key")
+
+	controller := createController(recorder)
 
 	proxy := goproxy.NewProxyHttpServer()
 	proxy.Verbose = *verbose
@@ -219,7 +174,7 @@ func main() {
 		})
 
 	go func() {
-		r.Run(":" + strconv.Itoa(*controlPort))
+		controller.Run(":" + strconv.Itoa(*controlPort))
 	}()
 
 	go func() {
@@ -231,7 +186,7 @@ func main() {
 
 	<-sigc
 
-	log.Println("goproxy: shutting down")
+	log.Println("groove: shutting down")
 	os.Exit(0)
 }
 
