@@ -10,27 +10,6 @@ import (
 	"net/http"
 )
 
-type ArchivedRequest struct {
-	Url     string              `json:"url"`
-	Method  string              `json:"method"`
-	Headers map[string][]string `json:"headers"`
-	Body    []byte              `json:"body"`
-
-	// Order that the request was issued; expected to be FIFO
-	// Allows requests with the same parameters to return in the correct order
-	//order int
-}
-
-type ArchivedResponse struct {
-	// The response mirrors the request on the same URL. Redirects are logged separately
-	// and will return a "Location" redirect prompt in the headers here.
-	/// response metadata
-	//redirected bool
-	Status  int                 `json:"status"`
-	Headers map[string][]string `json:"headers"`
-	Body    []byte              `json:"body"`
-}
-
 const (
 	RecorderModeOff   = iota
 	RecorderModeRead  = iota
@@ -60,33 +39,14 @@ func NewRecorder() *Recorder {
 }
 
 func (r *Recorder) LogPair(request *http.Request, response *http.Response) {
-	requestBody, errRequest := io.ReadAll(request.Body)
-	responseBody, errResponse := io.ReadAll(response.Body)
-
-	if errRequest != nil || errResponse != nil {
-		log.Println("Unable to read body stream.")
-		return
-	}
-
-	// Allow other clients to consume these bodies again
-	request.Body = ioutil.NopCloser(bytes.NewReader(requestBody))
-	response.Body = ioutil.NopCloser(bytes.NewReader(responseBody))
+	archivedRequest := requestToArchivedRequest(request)
+	archivedResponse := responseToArchivedResponse(response)
 
 	r.records = append(
 		r.records,
 		&RecordedRecord{
-			Request: ArchivedRequest{
-				// last url accessed - how do we get the first
-				Url:     request.URL.String(),
-				Method:  request.Method,
-				Headers: request.Header,
-				Body:    requestBody,
-			},
-			Response: ArchivedResponse{
-				Status:  response.StatusCode,
-				Headers: response.Header,
-				Body:    responseBody,
-			},
+			Request:  *archivedRequest,
+			Response: *archivedResponse,
 		},
 	)
 }
@@ -153,19 +113,7 @@ func (r *Recorder) FindMatchingResponse(request *http.Request) *http.Response {
 			r.consumedRecords = append(r.consumedRecords, recordIndex)
 
 			// Format the archived response as a full http response
-			resp := &http.Response{}
-			resp.Request = request
-			resp.TransferEncoding = request.TransferEncoding
-			resp.Header = make(http.Header)
-			for key, valueList := range record.Response.Headers {
-				for _, value := range valueList {
-					resp.Header.Add(key, value)
-				}
-			}
-			resp.StatusCode = record.Response.Status
-			resp.Status = http.StatusText(record.Response.Status)
-			resp.ContentLength = int64(len(record.Response.Body))
-			resp.Body = ioutil.NopCloser(bytes.NewReader(record.Response.Body))
+			resp := archivedResponseToResponse(request, &record.Response)
 			return resp
 		}
 	}

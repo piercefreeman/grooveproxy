@@ -46,6 +46,7 @@ func getRedirectHistory(response *http.Response) ([]*http.Request, []*http.Respo
 
 func main() {
 	recorder := NewRecorder()
+	cache := NewCache()
 
 	var (
 		verbose     = flag.Bool("v", true, "should every proxy request be logged to stdout")
@@ -59,7 +60,7 @@ func main() {
 	// Set our own CA instead of the one that's default bundled with the proxy
 	setCA("ssl/ca.crt", "ssl/ca.key")
 
-	controller := createController(recorder)
+	controller := createController(recorder, cache)
 
 	proxy := goproxy.NewProxyHttpServer()
 	proxy.Verbose = *verbose
@@ -137,6 +138,53 @@ func main() {
 
 				recorder.LogPair(request, response)
 				log.Println("Added record log.")
+			}
+
+			return response
+		},
+	)
+
+	proxy.OnRequest().DoFunc(
+		/*
+		 * Cache layer
+		 */
+		func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
+			// Determine if we have a cache result available
+			cacheValue := cache.GetCacheContents(r.URL.String())
+			if cacheValue != nil {
+				return r, archivedResponseToResponse(r, cacheValue)
+			}
+
+			// If we got here, we couldn't immediately resolve the cache
+			// Determine if we have permission to proceed for this URL
+			log.Println("Will acquire lock")
+			cache.AcquireRequestLock(r.URL.String())
+			log.Println("Did acquire lock")
+
+			// We now have permission to access this URL and should continue until complete
+			return r, nil
+		},
+	)
+
+	proxy.OnResponse().DoFunc(
+		/*
+		 * Cache layer
+		 */
+		func(response *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
+			log.Println("Got response")
+
+			// Attempt to update the cache with each historical value, since there
+			// might have been multiple hops in this request?
+			requestHistory, responseHistory := getRedirectHistory(response)
+
+			// When replaying this we want to replay it in order to capture all the
+			// event history and test redirect handlers
+			for i := 0; i < len(requestHistory); i++ {
+				request := requestHistory[i]
+				response := responseHistory[i]
+
+				cache.SetValidCacheContents(request, response)
+				cache.ReleaseRequestLock(request.URL.String())
 			}
 
 			return response

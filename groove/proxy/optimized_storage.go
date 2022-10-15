@@ -46,6 +46,7 @@ func (s *OptimizedCertStore) Fetch(host string, genCert func() (*tls.Certificate
 }
 
 func (s *OptimizedCertStore) hostLock(host string) *sync.Mutex {
+	// Only one host lock should be generated at one time
 	s.Lock()
 	defer s.Unlock()
 

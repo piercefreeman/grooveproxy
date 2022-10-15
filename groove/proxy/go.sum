@@ -43,6 +43,8 @@ github.com/piercefreeman/goproxy v0.0.3 h1:6hAyj4plFuu3+lgt5u5ZozcXjPSJ0QwtxuhMk
 github.com/piercefreeman/goproxy v0.0.3/go.mod h1:l5HLvLDhJ/BRwyAg1MZI7X0wKuyrFqCX7flLI11zsqg=
 github.com/pkg/diff v0.0.0-20210226163009-20ebb0f2a09e/go.mod h1:pJLUxLENpZxwdsKMEsNbx1VGcRFpLqf3715MtcvvzbA=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
+github.com/pquerna/cachecontrol v0.1.0 h1:yJMy84ti9h/+OEWa752kBTKv4XC30OtVVHYv/8cTqKc=
+github.com/pquerna/cachecontrol v0.1.0/go.mod h1:NrUG3Z7Rdu85UNR3vm7SOsl1nFIeSiQnrHV5K9mBcUI=
 github.com/refraction-networking/utls v1.1.3 h1:K9opY+iKxcGvHOBG2019wFEVtsNFh0f5WqHyc2i3iU0=
 github.com/refraction-networking/utls v1.1.3/go.mod h1:+D89TUtA8+NKVFj1IXWr0p3tSdX1+SqUB7rL0QnGqyg=
 github.com/rogpeppe/go-charset v0.0.0-20180617210344-2471d30d28b4/go.mod h1:qgYeAmZ5ZIpBWTGllZSQnw97Dj+woV0toclVaRGI8pc=
