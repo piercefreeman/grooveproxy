@@ -11,10 +11,10 @@ import (
 )
 
 type ArchivedRequest struct {
-	Url     string
-	Method  string
-	Headers map[string][]string
-	Body    []byte
+	Url     string              `json:"url"`
+	Method  string              `json:"method"`
+	Headers map[string][]string `json:"headers"`
+	Body    []byte              `json:"body"`
 
 	// Order that the request was issued; expected to be FIFO
 	// Allows requests with the same parameters to return in the correct order
@@ -26,9 +26,9 @@ type ArchivedResponse struct {
 	// and will return a "Location" redirect prompt in the headers here.
 	/// response metadata
 	//redirected bool
-	Status  int
-	Headers map[string][]string
-	Body    []byte
+	Status  int                 `json:"status"`
+	Headers map[string][]string `json:"headers"`
+	Body    []byte              `json:"body"`
 }
 
 const (
@@ -38,8 +38,8 @@ const (
 )
 
 type RecordedRecord struct {
-	Request  ArchivedRequest
-	Response ArchivedResponse
+	Request  ArchivedRequest  `json:"request"`
+	Response ArchivedResponse `json:"response"`
 	//inflightMilliseconds int
 }
 
@@ -122,9 +122,18 @@ func (r *Recorder) LoadData(fileHandler io.Reader) (err error) {
 		return err
 	}
 
+	// Wipe old data
+	r.Clear()
+
+	// Load fresh records into the structs
 	json.Unmarshal(output, &r.records)
 
 	return nil
+}
+
+func (r *Recorder) Clear() {
+	r.records = nil
+	r.consumedRecords = nil
 }
 
 func (r *Recorder) FindMatchingResponse(request *http.Request) *http.Response {
@@ -133,12 +142,13 @@ func (r *Recorder) FindMatchingResponse(request *http.Request) *http.Response {
 	 */
 	log.Printf("Record size: %d\n", len(r.records))
 	for recordIndex, record := range r.records {
-		// Only allow each request to be played back one time
-		if containsInt(r.consumedRecords, recordIndex) {
-			continue
-		}
-
 		if record.Request.Url == request.URL.String() {
+			// Only allow each request to be played back one time
+			if containsInt(r.consumedRecords, recordIndex) {
+				log.Printf("Already seen record, continuing: %s\n", request.URL.String())
+				continue
+			}
+
 			// Don't allow this same record to be played back again
 			r.consumedRecords = append(r.consumedRecords, recordIndex)
 

@@ -12,7 +12,7 @@ func createController(recorder *Recorder) *gin.Engine {
 	router.POST("/api/tape/record", func(c *gin.Context) {
 		// Start to record the requests, nullifying any ones from an old session
 		recorder.mode = RecorderModeWrite
-		recorder.records = nil
+		recorder.Clear()
 
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,
@@ -20,7 +20,8 @@ func createController(recorder *Recorder) *gin.Engine {
 	})
 
 	router.POST("/api/tape/stop", func(c *gin.Context) {
-		// Start to record the requests
+		// Stop recording requests, but don't call Stop because we want to keep
+		// the tape data around in case users access it
 		recorder.mode = RecorderModeOff
 
 		c.JSON(http.StatusOK, gin.H{
@@ -40,6 +41,8 @@ func createController(recorder *Recorder) *gin.Engine {
 
 	router.POST("/api/tape/load", func(c *gin.Context) {
 		recorder.mode = RecorderModeRead
+		recorder.Clear()
+
 		file, _ := c.FormFile("file")
 
 		fileHandler, err := file.Open()
