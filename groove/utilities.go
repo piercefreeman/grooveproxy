@@ -7,3 +7,13 @@ func reverseSlice[T any](s []T) {
 		s[left], s[right] = s[right], s[left]
 	}
 }
+
+func containsInt(s []int, search int) bool {
+	for _, value := range s {
+		if value == search {
+			return true
+		}
+	}
+
+	return false
+}

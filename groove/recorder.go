@@ -44,14 +44,18 @@ type RecordedRecord struct {
 }
 
 type Recorder struct {
-	mode     int // RecorderModeRead | RecorderModeWrite
-	requests []*RecordedRecord
+	mode    int // RecorderModeRead | RecorderModeWrite
+	records []*RecordedRecord
+
+	// Indexes of requests that are already consumed
+	consumedRecords []int
 }
 
 func NewRecorder() *Recorder {
 	return &Recorder{
-		mode:     RecorderModeOff,
-		requests: make([]*RecordedRecord, 0),
+		mode:            RecorderModeOff,
+		records:         make([]*RecordedRecord, 0),
+		consumedRecords: make([]int, 0),
 	}
 }
 
@@ -68,8 +72,8 @@ func (r *Recorder) LogPair(request *http.Request, response *http.Response) {
 	request.Body = ioutil.NopCloser(bytes.NewReader(requestBody))
 	response.Body = ioutil.NopCloser(bytes.NewReader(responseBody))
 
-	r.requests = append(
-		r.requests,
+	r.records = append(
+		r.records,
 		&RecordedRecord{
 			Request: ArchivedRequest{
 				// last url accessed - how do we get the first
@@ -91,8 +95,8 @@ func (r *Recorder) ExportData() (response *bytes.Buffer, err error) {
 	/*
 	 * Formats data in a readable payload, gzipped for space savings
 	 */
-	log.Printf("Total requests: %d", len(r.requests))
-	json, err := json.Marshal(r.requests)
+	log.Printf("Total requests: %d", len(r.records))
+	json, err := json.Marshal(r.records)
 
 	if err != nil {
 		log.Println("Unable to export json payload")
@@ -118,7 +122,7 @@ func (r *Recorder) LoadData(fileHandler io.Reader) (err error) {
 		return err
 	}
 
-	json.Unmarshal(output, &r.requests)
+	json.Unmarshal(output, &r.records)
 
 	return nil
 }
@@ -127,10 +131,18 @@ func (r *Recorder) FindMatchingResponse(request *http.Request) *http.Response {
 	/*
 	 * Given a new request, determine if we have a match in the tape to handle it
 	 */
-	// TODO: Implement order of operations for same output
-	log.Printf("Record size: %d\n", len(r.requests))
-	for _, record := range r.requests {
+	log.Printf("Record size: %d\n", len(r.records))
+	for recordIndex, record := range r.records {
+		// Only allow each request to be played back one time
+		if containsInt(r.consumedRecords, recordIndex) {
+			continue
+		}
+
 		if record.Request.Url == request.URL.String() {
+			// Don't allow this same record to be played back again
+			r.consumedRecords = append(r.consumedRecords, recordIndex)
+
+			// Format the archived response as a full http response
 			resp := &http.Response{}
 			resp.Request = request
 			resp.TransferEncoding = request.TransferEncoding
@@ -152,9 +164,9 @@ func (r *Recorder) FindMatchingResponse(request *http.Request) *http.Response {
 }
 
 func (r *Recorder) Print() {
-	log.Printf("Total requests: %d", len(r.requests))
+	log.Printf("Total requests: %d", len(r.records))
 
-	for _, record := range r.requests {
+	for _, record := range r.records {
 		log.Printf("Request archive: %s %s (response size: %d)\n", record.Request.Url, record.Request.Method, len(record.Response.Body))
 	}
 }

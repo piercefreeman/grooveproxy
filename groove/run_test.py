@@ -44,12 +44,20 @@ with sync_playwright() as p:
     print(main_page_body)
 
     # Manipulate the main body content
+    # Two requests
     new_tape = [
         {
             "Request": main_page_record["Request"],
             "Response": {
                 **main_page_record["Response"],
                "Body": b64encode("Mocked contents".encode()).decode(),
+            }
+        },
+        {
+            "Request": main_page_record["Request"],
+            "Response": {
+                **main_page_record["Response"],
+               "Body": b64encode("Mocked contents, second version".encode()).decode(),
             }
         }
     ]
@@ -68,9 +76,15 @@ with sync_playwright() as p:
         }
     )
     page = context.new_page()
+
     response = page.goto("https://freeman.vc")
+    first_content = page.content().strip()
+
+    response = page.goto("https://freeman.vc")
+    second_content = page.content().strip()
 
     # TODO: Parse html to avoid chrome formatting differences
-    assert page.content().strip() == "<html><head></head><body>Mocked contents</body></html>"
+    assert first_content.strip() == "<html><head></head><body>Mocked contents</body></html>"
+    assert second_content.strip() == "<html><head></head><body>Mocked contents, second version</body></html>"
 
     sleep(10000)

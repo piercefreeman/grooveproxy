@@ -50,9 +50,9 @@ func main() {
 
 	r := gin.Default()
 	r.POST("/api/tape/record", func(c *gin.Context) {
-		// Start to record the requests
+		// Start to record the requests, nullifying any ones from an old session
 		recorder.mode = RecorderModeWrite
-		recorder.requests = nil
+		recorder.records = nil
 
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,
@@ -131,6 +131,9 @@ func main() {
 	})
 
 	proxy.OnRequest().DoFunc(
+		/*
+		 * Recorder
+		 */
 		func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
 			// Only handle responses during write mode
 			if recorder.mode != RecorderModeRead {
@@ -144,9 +147,18 @@ func main() {
 				return r, recordResult
 			} else {
 				log.Printf("No matching record found: %s\n", r.URL.String())
+				// Implementation specific - for now fail result if we can't find a
+				// playback entry in the tape
+				return r, goproxy.NewResponse(
+					r,
+					goproxy.ContentTypeText,
+					http.StatusInternalServerError,
+					"Proxy blocked request",
+				)
 			}
 
-			return r, nil
+			// Passthrough
+			//return r, nil
 		})
 
 	proxy.OnResponse().DoFunc(
