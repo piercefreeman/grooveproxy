@@ -1,5 +1,4 @@
 from bs4 import BeautifulSoup
-from playwright.sync_api import sync_playwright
 from base64 import b64encode
 import pytest
 from playwright._impl._api_types import Error as PlaywrightError
@@ -56,7 +55,7 @@ def test_auth_requests():
 
 
 @pytest.mark.xfail()
-def test_auth_chromium():
+def test_auth_chromium(browser):
     """
     Ensure the proxy can forward to an end proxy
     """
@@ -83,19 +82,14 @@ def test_auth_chromium():
             )
         )
 
-        with sync_playwright() as p:
-            browser = p.chromium.launch(
-                headless=False,
-            )
-
-            # Make sure the end proxy has configured correctly
-            context = browser.new_context(
-                proxy={
-                    "server": proxy.base_url_proxy,
-                    "username": proxy.auth_username,
-                    "password": proxy.auth_password,
-                },
-            )
-            page = context.new_page()
-            page.goto("https://freeman.vc", timeout=5000)
-            assert BeautifulSoup(page.content()).text.strip() == "Test content"
+        # Make sure the end proxy has configured correctly
+        context = browser.new_context(
+            proxy={
+                "server": proxy.base_url_proxy,
+                "username": proxy.auth_username,
+                "password": proxy.auth_password,
+            },
+        )
+        page = context.new_page()
+        page.goto("https://freeman.vc", timeout=5000)
+        assert BeautifulSoup(page.content()).text.strip() == "Test content"

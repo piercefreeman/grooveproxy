@@ -2,12 +2,11 @@ from uuid import uuid4
 
 from bs4 import BeautifulSoup
 from groove.tests.mock_server import MockPageDefinition, mock_server
-from playwright.sync_api import sync_playwright
 
-from groove.proxy import CacheModeEnum, Groove
+from groove.proxy import CacheModeEnum
 
 
-def test_cache_off(proxy):
+def test_cache_off(proxy, browser):
     """
     Ensure the cache is off will route all requests
     """
@@ -28,24 +27,20 @@ def test_cache_off(proxy):
             content=f"<html><body>{request2_content}</body></html>"
         ),
     ]) as mock_url:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(
-                headless=False,
-            )
-            context = browser.new_context(
-                proxy={
-                    "server": proxy.base_url_proxy,
-                }
-            )
-            page = context.new_page()
-            page.goto(f"{mock_url}/test")
-            assert BeautifulSoup(page.content()).text.strip() == request1_content
+        context = browser.new_context(
+            proxy={
+                "server": proxy.base_url_proxy,
+            }
+        )
+        page = context.new_page()
+        page.goto(f"{mock_url}/test")
+        assert BeautifulSoup(page.content()).text.strip() == request1_content
 
-            page.goto(f"{mock_url}/test")
-            assert BeautifulSoup(page.content()).text.strip() == request2_content
+        page.goto(f"{mock_url}/test")
+        assert BeautifulSoup(page.content()).text.strip() == request2_content
 
 
-def test_cache_standard(proxy):
+def test_cache_standard(proxy, browser):
     """
     Ensure the cache respects server headers
     """
@@ -70,25 +65,21 @@ def test_cache_standard(proxy):
             }
         ),
     ]) as mock_url:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(
-                headless=False,
-            )
-            context = browser.new_context(
-                proxy={
-                    "server": proxy.base_url_proxy,
-                }
-            )
-            page = context.new_page()
-            page.goto(f"{mock_url}/test")
-            assert BeautifulSoup(page.content()).text.strip() == request1_content
+        context = browser.new_context(
+            proxy={
+                "server": proxy.base_url_proxy,
+            }
+        )
+        page = context.new_page()
+        page.goto(f"{mock_url}/test")
+        assert BeautifulSoup(page.content()).text.strip() == request1_content
 
-            # We should never hit the second definition because of the first requests' headers
-            page.goto(f"{mock_url}/test")
-            assert BeautifulSoup(page.content()).text.strip() == request1_content
+        # We should never hit the second definition because of the first requests' headers
+        page.goto(f"{mock_url}/test")
+        assert BeautifulSoup(page.content()).text.strip() == request1_content
 
 
-def test_cache_aggressive(proxy):
+def test_cache_aggressive(proxy, browser):
     """
     Ensure the aggressive cache will cache all requests
     """
@@ -109,18 +100,14 @@ def test_cache_aggressive(proxy):
             content=f"<html><body>{request2_content}</body></html>"
         ),
     ]) as mock_url:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(
-                headless=False,
-            )
-            context = browser.new_context(
-                proxy={
-                    "server": proxy.base_url_proxy,
-                }
-            )
-            page = context.new_page()
-            page.goto(f"{mock_url}/test")
-            assert BeautifulSoup(page.content()).text.strip() == request1_content
+        context = browser.new_context(
+            proxy={
+                "server": proxy.base_url_proxy,
+            }
+        )
+        page = context.new_page()
+        page.goto(f"{mock_url}/test")
+        assert BeautifulSoup(page.content()).text.strip() == request1_content
 
-            page.goto(f"{mock_url}/test")
-            assert BeautifulSoup(page.content()).text.strip() == request1_content
+        page.goto(f"{mock_url}/test")
+        assert BeautifulSoup(page.content()).text.strip() == request1_content

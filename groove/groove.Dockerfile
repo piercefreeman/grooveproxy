@@ -31,7 +31,7 @@ ADD . /app
 ADD ./groove_entrypoint.sh /app/benchmark_entrypoint.sh
 
 # Mount the scripts, don't perform any additional installation
-RUN poetry install --no-interaction
+RUN cd groove-python && poetry install --no-interaction
 
 # Install the certificate management tools that Chromium uses on Linux
 # This is required to add our custom certificates
@@ -41,8 +41,9 @@ RUN mkdir -p $HOME/.pki/nssdb
 
 # Install the dependent packages and root certificates
 RUN ./setup.sh
+RUN ./build.sh
 
-RUN poetry run playwright install-deps chromium
-RUN poetry run playwright install chromium
+RUN cd groove-python && poetry run playwright install-deps chromium
+RUN cd groove-python && poetry run playwright install chromium
 
-ENTRYPOINT [ "/app/benchmark_entrypoint.sh" ]
+ENTRYPOINT [ "/app/groove_entrypoint.sh" ]

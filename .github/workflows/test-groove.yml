@@ -37,7 +37,7 @@ jobs:
           push: true
           tags: ${{ env.IMAGE }}:groove-${{ github.sha }}
 
-  run_remaining:
+  run_tests:
     name: Run groove-python tests
     runs-on: ubuntu-latest
     needs: build
@@ -53,4 +53,4 @@ jobs:
 
       - name: Run test
         run:
-          docker run ${{ env.IMAGE }}:groove-${{ github.sha }} python-test
+          docker run ${{ env.IMAGE }}:groove-${{ github.sha }} test-python

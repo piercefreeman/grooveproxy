@@ -1,26 +1,22 @@
 from bs4 import BeautifulSoup
-from playwright.sync_api import sync_playwright
+from groove.proxy import TapeSession, TapeRecord, TapeResponse, TapeRequest
+from base64 import b64encode
+from uuid import uuid4
 
-from groove.proxy import TapeSession
 
-
-def test_tape(proxy):
+def test_tape(proxy, browser):
     """
     Ensure the basic tape functions work correctly
     """
     proxy.tape_start()
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=False,
-        )
-        context = browser.new_context(
-            proxy={
-                "server": proxy.base_url_proxy,
-            }
-        )
-        page = context.new_page()
-        page.goto("https://freeman.vc")
+    context = browser.new_context(
+        proxy={
+            "server": proxy.base_url_proxy,
+        }
+    )
+    page = context.new_page()
+    page.goto("https://freeman.vc")
 
     modified_records = 0
     session = proxy.tape_get()
@@ -34,22 +30,56 @@ def test_tape(proxy):
 
     proxy.tape_load(session)
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=False,
-        )
-        context = browser.new_context(
-            proxy={
-                "server": proxy.base_url_proxy,
-            }
-        )
-        page = context.new_page()
-        page.goto("https://freeman.vc")
+    context = browser.new_context(
+        proxy={
+            "server": proxy.base_url_proxy,
+        }
+    )
+    page = context.new_page()
+    page.goto("https://freeman.vc")
 
-        assert BeautifulSoup(page.content()).text.strip() == "Mocked content"
+    assert BeautifulSoup(page.content()).text.strip() == "Mocked content"
 
-def test_multiple_requests():
+
+def test_multiple_requests(proxy, browser):
     """
     Ensure mocked requests resolve in the same order
     """
-    pass
+    response_1 = str(uuid4())
+    response_2 = str(uuid4())
+
+    records = [
+        TapeRecord(
+            request=TapeRequest(
+                url="https://freeman.vc:443/",
+                method="GET",
+                headers={},
+                body=b"",
+            ),
+            response=TapeResponse(
+                status=200,
+                headers={},
+                body=b64encode(response.encode())
+            ),
+        )
+        for response in [response_1, response_2]
+    ]
+
+    proxy.tape_load(
+        TapeSession(
+            records=records
+        )
+    )
+
+    context = browser.new_context(
+        proxy={
+            "server": proxy.base_url_proxy,
+        }
+    )
+    page = context.new_page()
+
+    page.goto("https://freeman.vc")
+    assert BeautifulSoup(page.content()).text.strip() == response_1
+
+    page.goto("https://freeman.vc")
+    assert BeautifulSoup(page.content()).text.strip() == response_2

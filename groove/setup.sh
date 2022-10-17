@@ -21,3 +21,5 @@ fi
 mkdir -p ssl
 cp ca.crt ssl/ca.crt
 cp ca.key ssl/ca.key
+
+cd ..

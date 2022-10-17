@@ -31,7 +31,7 @@ AUTH_PASSWORD = "test-password"
         #)
     ]
 )
-def test_end_proxy(end_proxy, middle_proxy):
+def test_end_proxy(end_proxy, middle_proxy, browser):
     """
     Ensure the proxy can forward to an end proxy
     """
@@ -63,38 +63,33 @@ def test_end_proxy(end_proxy, middle_proxy):
                 )
             )
 
-            with sync_playwright() as p:
-                browser = p.chromium.launch(
-                    headless=False,
-                )
-
-                proxy_payload = {
-                    "server": end_proxy.base_url_proxy,
-                    **(
-                        {
-                            "username": end_proxy.auth_username,
-                            "password": end_proxy.auth_password,
-                        }
-                        if end_proxy.auth_username and end_proxy.auth_password
-                        else {}
-                    ),
-                }
-                print("End proxy request payload", proxy_payload)
-
-                # Make sure the end proxy has configured correctly
-                context = browser.new_context(
-                    proxy=proxy_payload,
-                )
-                page = context.new_page()
-                page.goto("https://freeman.vc", timeout=5000)
-                assert BeautifulSoup(page.content()).text.strip() == "Test content"
-
-                # Make sure the middle proxy routes through the end proxy correctly
-                context = browser.new_context(
-                    proxy={
-                        "server": middle_proxy.base_url_proxy,
+            proxy_payload = {
+                "server": end_proxy.base_url_proxy,
+                **(
+                    {
+                        "username": end_proxy.auth_username,
+                        "password": end_proxy.auth_password,
                     }
-                )
-                page = context.new_page()
-                page.goto("https://freeman.vc", timeout=5000)
-                assert BeautifulSoup(page.content()).text.strip() == "Test content"
+                    if end_proxy.auth_username and end_proxy.auth_password
+                    else {}
+                ),
+            }
+            print("End proxy request payload", proxy_payload)
+
+            # Make sure the end proxy has configured correctly
+            context = browser.new_context(
+                proxy=proxy_payload,
+            )
+            page = context.new_page()
+            page.goto("https://freeman.vc", timeout=5000)
+            assert BeautifulSoup(page.content()).text.strip() == "Test content"
+
+            # Make sure the middle proxy routes through the end proxy correctly
+            context = browser.new_context(
+                proxy={
+                    "server": middle_proxy.base_url_proxy,
+                }
+            )
+            page = context.new_page()
+            page.goto("https://freeman.vc", timeout=5000)
+            assert BeautifulSoup(page.content()).text.strip() == "Test content"
