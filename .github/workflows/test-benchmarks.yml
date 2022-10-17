@@ -1,7 +1,10 @@
-name: Test package
+name: Test benchmarks
 
 on:
-  - push
+  push:
+    paths:
+      - 'proxy-benchmarks/**/*'
+      - '.github/workflows/*benchmarks.*'
 
 env:
   IMAGE: piercefreeman/proxy-benchmarks
@@ -34,7 +37,8 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v3
         with:
-          file: benchmark.Dockerfile
+          file: proxy-benchmarks/benchmark.Dockerfile
+          context: proxy-benchmarks
           push: true
           tags: ${{ env.IMAGE }}:${{ github.sha }}
 
