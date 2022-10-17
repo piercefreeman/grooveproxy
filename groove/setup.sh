@@ -1,6 +1,8 @@
 #! /bin/bash
 set -e
 
+cd proxy
+
 go install
 
 openssl genrsa -out ca.key 2048
@@ -11,9 +13,9 @@ if [ "$(uname)" == "Darwin" ]; then
     sudo security add-trusted-cert -d -p ssl -p basic -k /Library/Keychains/System.keychain ./ca.crt
 elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
     # GNU/Linux
-    cp ./ca.crt /usr/local/share/ca-certificates/goproxy-mimic-ca.crt
+    sudo cp ./ca.crt /usr/local/share/ca-certificates/grooveproxy-ca.crt
     sudo update-ca-certificates
-    certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n "goproxy-mimic" -i /usr/local/share/ca-certificates/goproxy-mimic-ca.crt
+    sudo certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n "grooveproxy" -i /usr/local/share/ca-certificates/grooveproxy-ca.crt
 fi
 
 mkdir -p ssl

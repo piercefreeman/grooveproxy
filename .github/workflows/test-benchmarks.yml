@@ -1,7 +1,9 @@
 name: Test package
 
 on:
-  - push
+  push:
+    paths:
+      - '**/proxy_benchmarks/**/*'
 
 env:
   IMAGE: piercefreeman/proxy-benchmarks
