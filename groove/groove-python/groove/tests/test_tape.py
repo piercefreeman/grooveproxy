@@ -1,11 +1,13 @@
-from groove.proxy import Groove
+from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 
-def test_tape():
+from groove.proxy import TapeSession
+
+
+def test_tape(proxy):
     """
     Ensure the basic tape functions work correctly
     """
-    proxy = Groove()
     proxy.tape_start()
 
     with sync_playwright() as p:
@@ -22,11 +24,12 @@ def test_tape():
 
     modified_records = 0
     session = proxy.tape_get()
+    assert len(session.records) > 0
+
     for record in session.records:
         if record.request.url == "https://freeman.vc:443/":
             record.response.body = "Mocked content".encode()
             modified_records += 1
-
     assert modified_records == 1
 
     proxy.tape_load(session)
@@ -43,8 +46,7 @@ def test_tape():
         page = context.new_page()
         page.goto("https://freeman.vc")
 
-        # TODO: Parse html to avoid chrome formatting differences
-        assert page.content().strip() == "<html><head></head><body>Mocked content</body></html>"
+        assert BeautifulSoup(page.content()).text.strip() == "Mocked content"
 
 def test_multiple_requests():
     """

@@ -1,9 +1,11 @@
-module proxy_benchmarks/goproxymimic
+module grooveproxy
 
 go 1.18
 
+replace github.com/piercefreeman/goproxy => /Users/piercefreeman/projects/goproxy
+
 require (
-	github.com/piercefreeman/goproxy v0.0.3
+	github.com/piercefreeman/goproxy v0.0.4
 	github.com/refraction-networking/utls v1.1.3
 	golang.org/x/net v0.0.0-20221012135044-0b7e1fb9d458
 )

@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -39,6 +40,8 @@ type roundTripper struct {
 	transport http.RoundTripper
 
 	initConn net.Conn
+
+	Dialer func(network string, addr string) (net.Conn, error)
 }
 
 func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -58,13 +61,15 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 func (rt *roundTripper) getTransport(req *http.Request) error {
 	switch strings.ToLower(req.URL.Scheme) {
 	case "http":
-		rt.transport = &http.Transport{Dial: net.Dial}
+		log.Println("Dial HTTP")
+		rt.transport = &http.Transport{Dial: rt.Dialer}
 		return nil
 	case "https":
 	default:
 		return fmt.Errorf("meek_lite: invalid URL scheme: '%v'", req.URL.Scheme)
 	}
 
+	log.Println("Dial TLS")
 	_, err := rt.dialTLS("tcp", getDialTLSAddr(req.URL))
 	switch err {
 	case errProtocolNegotiated:
@@ -82,6 +87,7 @@ func (rt *roundTripper) dialTLS(network, addr string) (net.Conn, error) {
 	// Unlike rt.transport, this is protected by a critical section
 	// since past the initial manual call from getTransport, the HTTP
 	// client will be the caller.
+	log.Println("Dial TLS")
 	rt.Lock()
 	defer rt.Unlock()
 
@@ -92,7 +98,8 @@ func (rt *roundTripper) dialTLS(network, addr string) (net.Conn, error) {
 		return conn, nil
 	}
 
-	rawConn, err := net.Dial(network, addr)
+	log.Println("Dialer tls")
+	rawConn, err := rt.Dialer(network, addr)
 	if err != nil {
 		return nil, err
 	}
@@ -151,8 +158,10 @@ func getDialTLSAddr(u *url.URL) string {
 	return net.JoinHostPort(u.Host, u.Scheme)
 }
 
-func newRoundTripper() http.RoundTripper {
-	return &roundTripper{}
+func newRoundTripper() *roundTripper {
+	return &roundTripper{
+		Dialer: net.Dial,
+	}
 }
 
 func init() {

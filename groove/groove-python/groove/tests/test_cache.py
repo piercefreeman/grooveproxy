@@ -1,15 +1,16 @@
-from groove.proxy import Groove, CacheModeEnum
-from playwright.sync_api import sync_playwright
-from groove.tests.mock_server import MockPageDefinition, mock_server
-from bs4 import BeautifulSoup
 from uuid import uuid4
 
+from bs4 import BeautifulSoup
+from groove.tests.mock_server import MockPageDefinition, mock_server
+from playwright.sync_api import sync_playwright
 
-def test_cache_off():
+from groove.proxy import CacheModeEnum, Groove
+
+
+def test_cache_off(proxy):
     """
     Ensure the cache is off will route all requests
     """
-    proxy = Groove()
     proxy.set_cache_mode(CacheModeEnum.OFF)
 
     # Leverage random identifiers for each test to ensure there isn't
@@ -40,17 +41,57 @@ def test_cache_off():
             page.goto(f"{mock_url}/test")
             assert BeautifulSoup(page.content()).text.strip() == request1_content
 
-            page.goto("https://freeman.vc")
-
             page.goto(f"{mock_url}/test")
             assert BeautifulSoup(page.content()).text.strip() == request2_content
 
-def test_cache_aggressive():
+
+def test_cache_standard(proxy):
+    """
+    Ensure the cache respects server headers
+    """
+    proxy.set_cache_mode(CacheModeEnum.STANDARD)
+
+    request1_content = str(uuid4())
+    request2_content = str(uuid4())
+
+    with mock_server([
+        MockPageDefinition(
+            "/test",
+            content=f"<html><body>{request1_content}</body></html>",
+            headers={
+                "Cache-Control": "max-age=604800",
+            }
+        ),
+        MockPageDefinition(
+            "/test",
+            content=f"<html><body>{request2_content}</body></html>",
+            headers={
+                "Cache-Control": "max-age=604800",
+            }
+        ),
+    ]) as mock_url:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(
+                headless=False,
+            )
+            context = browser.new_context(
+                proxy={
+                    "server": proxy.base_url_proxy,
+                }
+            )
+            page = context.new_page()
+            page.goto(f"{mock_url}/test")
+            assert BeautifulSoup(page.content()).text.strip() == request1_content
+
+            # We should never hit the second definition because of the first requests' headers
+            page.goto(f"{mock_url}/test")
+            assert BeautifulSoup(page.content()).text.strip() == request1_content
+
+
+def test_cache_aggressive(proxy):
     """
     Ensure the aggressive cache will cache all requests
     """
-    proxy = Groove()
-
     # Clear previous cache records, if they exist
     proxy.set_cache_mode(CacheModeEnum.OFF)
     proxy.set_cache_mode(CacheModeEnum.AGGRESSIVE)

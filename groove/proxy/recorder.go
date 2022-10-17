@@ -8,6 +8,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+
+	goproxy "github.com/piercefreeman/goproxy"
 )
 
 const (
@@ -127,4 +129,65 @@ func (r *Recorder) Print() {
 	for _, record := range r.records {
 		log.Printf("Request archive: %s %s (response size: %d)\n", record.Request.Url, record.Request.Method, len(record.Response.Body))
 	}
+}
+
+func setupRecorderMiddleware(proxy *goproxy.ProxyHttpServer, recorder *Recorder) {
+	proxy.OnRequest().DoFunc(
+		/*
+		 * Recorder
+		 */
+		func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
+			// Only handle responses during write mode
+			log.Printf("Recorder get mode... %d\n", recorder.mode)
+			if recorder.mode != RecorderModeRead {
+				return r, nil
+			}
+
+			recordResult := recorder.FindMatchingResponse(r)
+
+			if recordResult != nil {
+				log.Printf("Record found: %s\n", r.URL.String())
+				return r, recordResult
+			} else {
+				log.Printf("No matching record found: %s\n", r.URL.String())
+				// Implementation specific - for now fail result if we can't find a
+				// playback entry in the tape
+				return r, goproxy.NewResponse(
+					r,
+					goproxy.ContentTypeText,
+					http.StatusInternalServerError,
+					"Proxy blocked request",
+				)
+			}
+
+			// Passthrough
+			//return r, nil
+		})
+
+	proxy.OnResponse().DoFunc(
+		/*
+		 * Recorder
+		 */
+		func(response *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
+			// Only handle responses during write mode
+			if recorder.mode != RecorderModeWrite {
+				return response
+			}
+
+			log.Println("Record request/response...")
+			requestHistory, responseHistory := getRedirectHistory(response)
+
+			// When replaying this we want to replay it in order to capture all the
+			// event history and test redirect handlers
+			for i := 0; i < len(requestHistory); i++ {
+				request := requestHistory[i]
+				response := responseHistory[i]
+
+				recorder.LogPair(request, response)
+				log.Println("Added record log.")
+			}
+
+			return response
+		},
+	)
 }

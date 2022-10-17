@@ -1,15 +1,16 @@
+from collections import Counter, defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
+from functools import partial
+from itertools import groupby
 from multiprocessing import Process, Semaphore
-from typing import Optional, Any
+from time import sleep
+from typing import Any, Optional
 
 import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import Response
-from functools import partial
-from time import sleep
-from collections import Counter, defaultdict
-from itertools import groupby
+
 
 @dataclass
 class MockPageDefinition:
@@ -18,6 +19,7 @@ class MockPageDefinition:
     content_type: str = "text/html"
 
     method: str = "get"
+    headers: dict[str, str] | None = None
 
     # Optional function callable - one should be specified
     content: Optional[str] = None
@@ -52,7 +54,8 @@ def launch_server(payloads: list[MockPageDefinition], port: int, setup_callback:
         return Response(
             content=definition.content, 
             status_code=definition.status_code,
-            media_type=definition.content_type
+            media_type=definition.content_type,
+            headers=definition.headers,
         )
 
     # Group by URL (maintaining the original order)

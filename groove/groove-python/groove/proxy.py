@@ -1,11 +1,15 @@
-from types import NotImplementedType
-from pydantic import BaseModel, validator
-from gzip import compress, decompress
-from json import loads, dumps
 from base64 import b64decode, b64encode
-from requests import Session
-from urllib.parse import urljoin
+from contextlib import contextmanager
 from enum import Enum
+from gzip import compress, decompress
+from json import dumps, loads
+from subprocess import Popen
+from time import sleep
+from urllib.parse import urljoin
+
+from groove.assets import get_asset_path
+from pydantic import BaseModel, validator
+from requests import Session
 
 
 class CacheModeEnum(Enum):
@@ -67,14 +71,67 @@ class TapeSession(BaseModel):
 
 
 class Groove:
-    def __init__(self, command_timeout=5):
+    def __init__(
+        self,
+        command_timeout: int = 5,
+        port: int = 6010,
+        control_port: int = 6011,
+        proxy_server: str | None = None,
+        proxy_username: str | None = None,
+        proxy_password: str | None = None,
+        auth_username: str | None = None,
+        auth_password: str | None = None,
+    ):
         self.session = Session()
-        self.base_url_proxy = "http://localhost:6010"
-        self.base_url_control = "http://localhost:5010"
+
+        self.port = port
+        self.control_port = control_port
+        self.proxy_server = proxy_server
+        self.proxy_username = proxy_username
+        self.proxy_password = proxy_password
+        self.auth_username = auth_username
+        self.auth_password = auth_password
+
+        self.base_url_proxy = f"http://localhost:{port}"
+        self.base_url_control = f"http://localhost:{control_port}"
+
         self.timeout = command_timeout
 
+    @contextmanager
     def launch(self):
-        raise NotImplementedType
+        parameters = {
+            "--ca-certificate": get_asset_path("ssl/ca.crt"),
+            "--ca-key": get_asset_path("ssl/ca.key"),
+            "--port": self.port,
+            "--control-port": self.control_port,
+            "--proxy-server": self.proxy_server,
+            "--proxy-username": self.proxy_username,
+            "--proxy-password": self.proxy_password,
+            "--auth-username": self.auth_username,
+            "--auth-password": self.auth_password,
+        }
+
+        # Not specifying parameters should make them null
+        parameters = {key: value for key, value in parameters.items() if value is not None}
+
+        process = Popen(
+            [
+                str(get_asset_path("grooveproxy")),
+                *[
+                    str(item)
+                    for key, value in parameters.items()
+                    for item in [key, value]
+                ]
+            ]
+        )
+
+        # Wait for launch
+        sleep(0.5)
+
+        try:
+            yield
+        finally:
+            process.terminate()
 
     def tape_start(self):
         response = self.session.post(urljoin(self.base_url_control, "/api/tape/record"), timeout=self.timeout)

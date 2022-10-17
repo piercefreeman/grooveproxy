@@ -2,12 +2,9 @@
 package main
 
 import (
-	"bufio"
-	"context"
 	"flag"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -17,33 +14,6 @@ import (
 	"github.com/piercefreeman/goproxy"
 )
 
-func orPanic(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
-func getRedirectHistory(response *http.Response) ([]*http.Request, []*http.Response) {
-	// The eventually resolved response payload carries alongside all of the request
-	// history - this function reassembles it
-	requestHistory := make([]*http.Request, 0)
-	responseHistory := make([]*http.Response, 0)
-
-	for response != nil {
-		request := response.Request
-		requestHistory = append(requestHistory, request)
-		responseHistory = append(responseHistory, response)
-		response = request.Response
-	}
-
-	// The response order is actually reversed from what we expect
-	// The last request that eventually made the response comes first in the slice
-	reverseSlice(requestHistory)
-	reverseSlice(responseHistory)
-
-	return requestHistory, responseHistory
-}
-
 func main() {
 	recorder := NewRecorder()
 	cache := NewCache()
@@ -51,30 +21,66 @@ func main() {
 	var (
 		verbose     = flag.Bool("v", true, "should every proxy request be logged to stdout")
 		port        = flag.Int("port", 6010, "proxy http listen address")
-		controlPort = flag.Int("control-port", 5010, "control API listen address")
+		controlPort = flag.Int("control-port", 6011, "control API listen address")
+
+		// Location to CA
+		caCertificate = flag.String("ca-certificate", "ssl/ca.crt", "Path to CA Certificate")
+		caKey         = flag.String("ca-key", "ssl/ca.key", "Path to CA Key")
+
+		// Proxy settings for 3rd party proxies
+		proxyServer   = flag.String("proxy-server", "", "3rd party proxy http server")
+		proxyUsername = flag.String("proxy-username", "", "3rd party proxy username")
+		proxyPassword = flag.String("proxy-password", "", "3rd party proxy password")
+
+		// Require authentication to access this proxy
+		//authUsername = flag.String("auth-username", "", "Require authentication to the current server")
+		//authPassword = flag.String("auth-password", "", "Require authentication to the current server")
 	)
 	flag.Parse()
 
 	log.Printf("Verbose: %v", *verbose)
 
 	// Set our own CA instead of the one that's default bundled with the proxy
-	setCA("ssl/ca.crt", "ssl/ca.key")
+	err := setCA(*caCertificate, *caKey)
+
+	if err != nil {
+		log.Fatal(fmt.Errorf("Error setting CA: %w", err))
+	}
 
 	controller := createController(recorder, cache)
 
 	proxy := goproxy.NewProxyHttpServer()
 	proxy.Verbose = *verbose
 
+	// If specified, protect the proxy with an auth login
+	// @pierce - Currently failing on MITM because of repeat CONNECTs, some without auth
+	/*if len(*authUsername) > 0 && len(*authPassword) > 0 {
+		log.Println("Protect proxy with username and password")
+		auth.ProxyBasicMitm(proxy, "my_realm", func(user, pwd string) bool {
+			return user == *authUsername && pwd == *authPassword
+		})
+	} else {
+		log.Println("Creating unauthenticated proxy")
+	}*/
+
 	// Our other implementations cache the certificates for some length of time, so we do the
 	// same here for equality in benchmarking
 	proxy.CertStore = NewOptimizedCertStore()
 
 	// Fingerprint mimic logic
-	proxy.RoundTripper = newRoundTripper()
+	roundTripper := newRoundTripper()
+	if len(*proxyServer) > 0 {
+		setupEndProxyMiddleware(proxy, roundTripper, *proxyServer, *proxyUsername, *proxyPassword)
+	}
+
+	proxy.RoundTripper = http.RoundTripper(roundTripper)
 
 	if proxy.Verbose {
 		log.Printf("Server starting up! - configured to listen on http interface %d", *port)
 	}
+
+	setupRecorderMiddleware(proxy, recorder)
+	setupCacheMiddleware(proxy, cache, recorder)
 
 	proxy.NonproxyHandler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if req.Host == "" {
@@ -86,140 +92,8 @@ func main() {
 		proxy.ServeHTTP(w, req)
 	})
 
-	proxy.OnRequest().DoFunc(
-		/*
-		 * Recorder
-		 */
-		func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
-			// Only handle responses during write mode
-			if recorder.mode != RecorderModeRead {
-				return r, nil
-			}
-
-			recordResult := recorder.FindMatchingResponse(r)
-
-			if recordResult != nil {
-				log.Printf("Record found: %s\n", r.URL.String())
-				return r, recordResult
-			} else {
-				log.Printf("No matching record found: %s\n", r.URL.String())
-				// Implementation specific - for now fail result if we can't find a
-				// playback entry in the tape
-				return r, goproxy.NewResponse(
-					r,
-					goproxy.ContentTypeText,
-					http.StatusInternalServerError,
-					"Proxy blocked request",
-				)
-			}
-
-			// Passthrough
-			//return r, nil
-		})
-
-	proxy.OnResponse().DoFunc(
-		/*
-		 * Recorder
-		 */
-		func(response *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
-			// Only handle responses during write mode
-			if recorder.mode != RecorderModeWrite {
-				return response
-			}
-
-			log.Println("Record request/response...")
-			requestHistory, responseHistory := getRedirectHistory(response)
-
-			// When replaying this we want to replay it in order to capture all the
-			// event history and test redirect handlers
-			for i := 0; i < len(requestHistory); i++ {
-				request := requestHistory[i]
-				response := responseHistory[i]
-
-				recorder.LogPair(request, response)
-				log.Println("Added record log.")
-			}
-
-			return response
-		},
-	)
-
-	proxy.OnRequest().DoFunc(
-		/*
-		 * Cache layer
-		 */
-		func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
-			// Determine if we have a cache result available
-			cacheValue := cache.GetCacheContents(r.URL.String())
-			if cacheValue != nil {
-				return r, archivedResponseToResponse(r, cacheValue)
-			}
-
-			// If we got here, we couldn't immediately resolve the cache
-			// Determine if we have permission to proceed for this URL
-			log.Println("Will acquire lock")
-			cache.AcquireRequestLock(r.URL.String())
-			log.Println("Did acquire lock")
-
-			// We now have permission to access this URL and should continue until complete
-			return r, nil
-		},
-	)
-
-	proxy.OnResponse().DoFunc(
-		/*
-		 * Cache layer
-		 */
-		func(response *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
-			log.Println("Got response")
-
-			// Attempt to update the cache with each historical value, since there
-			// might have been multiple hops in this request?
-			requestHistory, responseHistory := getRedirectHistory(response)
-
-			// When replaying this we want to replay it in order to capture all the
-			// event history and test redirect handlers
-			for i := 0; i < len(requestHistory); i++ {
-				request := requestHistory[i]
-				response := responseHistory[i]
-
-				cache.SetValidCacheContents(request, response)
-				cache.ReleaseRequestLock(request.URL.String())
-			}
-
-			return response
-		},
-	)
-
 	proxy.OnRequest(goproxy.ReqHostMatches(regexp.MustCompile("^.*$"))).
 		HandleConnect(goproxy.AlwaysMitm)
-
-	// https://github.com/elazarl/goproxy/blob/master/examples/goproxy-eavesdropper/main.go
-	proxy.OnRequest(goproxy.ReqHostMatches(regexp.MustCompile("^.*:80$"))).
-		HijackConnect(func(req *http.Request, client net.Conn, ctx *goproxy.ProxyCtx) {
-			defer func() {
-				if e := recover(); e != nil {
-					ctx.Logf("error connecting to remote: %v", e)
-					client.Write([]byte("HTTP/1.1 500 Cannot reach destination\r\n\r\n"))
-				}
-				client.Close()
-			}()
-			clientBuf := bufio.NewReadWriter(bufio.NewReader(client), bufio.NewWriter(client))
-
-			remote, err := connectDial(req.Context(), proxy, "tcp", req.URL.Host)
-			orPanic(err)
-			remoteBuf := bufio.NewReadWriter(bufio.NewReader(remote), bufio.NewWriter(remote))
-			for {
-				req, err := http.ReadRequest(clientBuf.Reader)
-				orPanic(err)
-				orPanic(req.Write(remoteBuf))
-				orPanic(remoteBuf.Flush())
-				resp, err := http.ReadResponse(remoteBuf.Reader, req)
-				orPanic(err)
-				orPanic(resp.Write(clientBuf.Writer))
-				orPanic(clientBuf.Flush())
-			}
-		})
 
 	go func() {
 		controller.Run(":" + strconv.Itoa(*controlPort))
@@ -236,21 +110,4 @@ func main() {
 
 	log.Println("groove: shutting down")
 	os.Exit(0)
-}
-
-// copied/converted from https.go
-func dial(ctx context.Context, proxy *goproxy.ProxyHttpServer, network, addr string) (c net.Conn, err error) {
-	if proxy.Tr.DialContext != nil {
-		return proxy.Tr.DialContext(ctx, network, addr)
-	}
-	var d net.Dialer
-	return d.DialContext(ctx, network, addr)
-}
-
-// copied/converted from https.go
-func connectDial(ctx context.Context, proxy *goproxy.ProxyHttpServer, network, addr string) (c net.Conn, err error) {
-	if proxy.ConnectDial == nil {
-		return dial(ctx, proxy, network, addr)
-	}
-	return proxy.ConnectDial(network, addr)
 }

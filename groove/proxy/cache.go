@@ -1,10 +1,12 @@
 package main
 
 import (
+	"log"
 	"net/http"
 	"sync"
 	"time"
 
+	goproxy "github.com/piercefreeman/goproxy"
 	"github.com/pquerna/cachecontrol"
 )
 
@@ -164,4 +166,60 @@ func (c *Cache) cacheEntryValid(cacheEntry *CacheEntry) bool {
 
 	now := time.Now()
 	return now.Before(cacheEntry.cacheInvalidation)
+}
+
+func setupCacheMiddleware(proxy *goproxy.ProxyHttpServer, cache *Cache, recorder *Recorder) {
+	proxy.OnRequest().DoFunc(
+		/*
+		 * Cache layer
+		 */
+		func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
+			// Only cache if we are not replaying the tape
+			if recorder.mode == RecorderModeRead {
+				return r, nil
+			}
+
+			// Determine if we have a cache result available
+			cacheValue := cache.GetCacheContents(r.URL.String())
+			if cacheValue != nil {
+				return r, archivedResponseToResponse(r, cacheValue)
+			}
+
+			// If we got here, we couldn't immediately resolve the cache
+			// Determine if we have permission to proceed for this URL
+			log.Println("Will acquire lock")
+			cache.AcquireRequestLock(r.URL.String())
+			log.Println("Did acquire lock")
+
+			// We now have permission to access this URL and should continue until complete
+			return r, nil
+		},
+	)
+
+	proxy.OnResponse().DoFunc(
+		/*
+		 * Cache layer
+		 */
+		func(response *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
+			if recorder.mode == RecorderModeRead {
+				return response
+			}
+
+			// Attempt to update the cache with each historical value, since there
+			// might have been multiple hops in this request?
+			requestHistory, responseHistory := getRedirectHistory(response)
+
+			// When replaying this we want to replay it in order to capture all the
+			// event history and test redirect handlers
+			for i := 0; i < len(requestHistory); i++ {
+				request := requestHistory[i]
+				response := responseHistory[i]
+
+				cache.SetValidCacheContents(request, response)
+				cache.ReleaseRequestLock(request.URL.String())
+			}
+
+			return response
+		},
+	)
 }
