@@ -1,4 +1,4 @@
-__pycache__
+.DS_Store
 
 node_modules
 
@@ -22,3 +22,4 @@ dist
 
 # Exclude built python files
 **/*.so
+__pycache__
