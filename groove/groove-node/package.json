@@ -1,5 +1,5 @@
 {
-  "name": "groove",
+  "name": "@piercefreeman/groove",
   "version": "1.0.0",
   "description": "",
   "main": "dist/index.js",
@@ -8,6 +8,7 @@
     "test": "tests"
   },
   "scripts": {
+    "prepublish": "tsc",
     "postinstall": "./lifecycle/install.sh",
     "preuninstall": "./lifecycle/uninstall.sh",
     "build": "tsc",

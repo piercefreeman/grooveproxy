@@ -135,3 +135,32 @@ jobs:
         run: |
           cd groove/groove-python
           poetry publish --username ${{ secrets.PYPI_USERNAME }} --password ${{ secrets.PYPI_PASSWORD }}
+
+  publish_node_package:
+    name: Publish node package
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      # Setup .npmrc file to publish to npm
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '16.x'
+          registry-url: 'https://registry.npmjs.org'
+
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '^1.18.1'
+
+      - name: Install
+        run: |
+          cd groove/groove-node
+          npm install --include=dev
+
+      - name: Publish
+        run: |
+          cd groove/groove-node
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }} 
