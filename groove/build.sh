@@ -10,5 +10,8 @@ rm -rf ./groove-python/groove/assets/grooveproxy
 mkdir -p build
 (cd proxy && go build -o ../build)
 
-# Python
+# Manual Python install
 cp ./build/grooveproxy ./groove-python/groove/assets/grooveproxy
+
+# Manual Node install
+cp ./build/grooveproxy ./groove-node/node_modules/.bin/grooveproxy

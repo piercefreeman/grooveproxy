@@ -22,7 +22,7 @@ ENV PATH="/root/.local/bin:/$NVM_DIR/versions/node/$NODE_VERSION/bin:$PATH"
 
 WORKDIR /app
 
-# Install benchmarking dependencies
+# Install python dependencies
 ADD groove-python/poetry.lock groove-python/poetry.lock
 ADD groove-python/pyproject.toml groove-python/pyproject.toml
 RUN cd groove-python && poetry install --no-root
@@ -32,6 +32,11 @@ ADD ./groove_entrypoint.sh /app/benchmark_entrypoint.sh
 
 # Mount the scripts, don't perform any additional installation
 RUN cd groove-python && poetry install --no-interaction
+
+# This has to be done after application files are moved over, because it relies on the tsconfig
+# and other raw file paths. Ideally npm dependencies would be installed alongside the python raw
+# ones before code is moved over
+RUN cd groove-node && npm install && npm run build
 
 # Install the certificate management tools that Chromium uses on Linux
 # This is required to add our custom certificates
