@@ -58,12 +58,18 @@ def build(setup_kwargs):
     cmd.ensure_finalized()
     cmd.run()
 
+    # This is somewhat of a hack with go executables; this pipeline will package
+    # them as .so files but they aren't actually built libraries. We maintain
+    # this convention only for the ease of plugging in to poetry and distutils that
+    # use this suffix to indicate the build architecture and run on the
+    # correct downstream client OS.
     for output in cmd.get_outputs():
         relative_extension = Path(output).relative_to(cmd.build_lib)
         copyfile(output, relative_extension)
         mode = stat(relative_extension).st_mode
         mode |= (mode & 0o444) >> 2
         chmod(relative_extension, mode)
+
 
 if __name__ == "__main__":
     build({})
