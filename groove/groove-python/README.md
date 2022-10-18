@@ -23,9 +23,10 @@ install-ca
 
 Instantiating Groove with the default parameters is usually fine for most deployments. To ensure we clean up resources once you're completed with the proxy, wrap your code in the `launch` contextmanager.
 
-```
+```python
 from groove.proxy import Groove
 from requests import get
+from pathlib import Path
 
 proxy = Groove()
 with proxy.launch():
@@ -34,16 +35,18 @@ with proxy.launch():
         proxies={
             "http": proxy.base_url_proxy,
             "https": proxy.base_url_proxy,
-        }
+        },
+        verify=str(Path("~/.grooveproxy/ca.crt").expanduser()),
     )
     assert response.status_code == 200
 ```
 
 Create a fully fake outbound for testing:
 
-```
+```python
 from groove.proxy import Groove
 from requests import get
+from pathlib import Path
 
 records = [
     TapeRecord(
@@ -74,7 +77,8 @@ with proxy.launch():
         proxies={
             "http": proxy.base_url_proxy,
             "https": proxy.base_url_proxy,
-        }
+        },
+        verify=str(Path("~/.grooveproxy/ca.crt").expanduser())
     )
     assert response.content == b"Test response"
 ```
