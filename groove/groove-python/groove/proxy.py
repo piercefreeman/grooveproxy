@@ -100,8 +100,6 @@ class Groove:
     @contextmanager
     def launch(self):
         parameters = {
-            "--ca-certificate": get_asset_path("ssl/ca.crt"),
-            "--ca-key": get_asset_path("ssl/ca.key"),
             "--port": self.port,
             "--control-port": self.control_port,
             "--proxy-server": self.proxy_server,

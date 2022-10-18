@@ -11,6 +11,4 @@ mkdir -p build
 (cd proxy && go build -o ../build)
 
 # Python
-rm -rf ./groove-python/groove/assets/ssl
 cp ./build/grooveproxy ./groove-python/groove/assets/grooveproxy
-cp -r ./proxy/ssl ./groove-python/groove/assets/ssl

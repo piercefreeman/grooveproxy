@@ -18,14 +18,24 @@ func main() {
 	recorder := NewRecorder()
 	cache := NewCache()
 
+	if len(os.Args) > 1 {
+		command := os.Args[1]
+		if command == "install-ca" {
+			installCA()
+			return
+		} else {
+			// Assume other requests will be handled by the regular proxy - passthrough
+		}
+	}
+
 	var (
 		verbose     = flag.Bool("v", true, "should every proxy request be logged to stdout")
 		port        = flag.Int("port", 6010, "proxy http listen address")
 		controlPort = flag.Int("control-port", 6011, "control API listen address")
 
 		// Location to CA
-		caCertificate = flag.String("ca-certificate", "ssl/ca.crt", "Path to CA Certificate")
-		caKey         = flag.String("ca-key", "ssl/ca.key", "Path to CA Key")
+		caCertificate = flag.String("ca-certificate", "", "Path to CA Certificate")
+		caKey         = flag.String("ca-key", "", "Path to CA Key")
 
 		// Proxy settings for 3rd party proxies
 		proxyServer   = flag.String("proxy-server", "", "3rd party proxy http server")
@@ -40,11 +50,17 @@ func main() {
 
 	log.Printf("Verbose: %v", *verbose)
 
-	// Set our own CA instead of the one that's default bundled with the proxy
-	err := setCA(*caCertificate, *caKey)
-
-	if err != nil {
-		log.Fatal(fmt.Errorf("Error setting CA: %w", err))
+	if len(*caCertificate) == 0 || len(*caKey) == 0 {
+		log.Println("Falling back to default CA certificate")
+		_, localCAPath, localCAKey := getLocalCAPaths()
+		if err := setCA(localCAPath, localCAKey); err != nil {
+			log.Fatal(fmt.Errorf("Error setting CA: %w", err))
+		}
+	} else {
+		// Set our own CA instead of the one that's default bundled with the proxy
+		if err := setCA(*caCertificate, *caKey); err != nil {
+			log.Fatal(fmt.Errorf("Error setting CA: %w", err))
+		}
 	}
 
 	controller := createController(recorder, cache)
