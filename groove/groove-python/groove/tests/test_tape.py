@@ -1,7 +1,9 @@
-from bs4 import BeautifulSoup
-from groove.proxy import TapeSession, TapeRecord, TapeResponse, TapeRequest
 from base64 import b64encode
 from uuid import uuid4
+
+from bs4 import BeautifulSoup
+
+from groove.proxy import TapeRecord, TapeRequest, TapeResponse, TapeSession
 
 
 def test_tape(proxy, browser):

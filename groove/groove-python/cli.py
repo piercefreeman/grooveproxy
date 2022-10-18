@@ -1,5 +1,7 @@
 from subprocess import run
+
 from groove.assets import get_asset_path
+
 
 def install_ca():
     run(

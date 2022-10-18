@@ -17,4 +17,8 @@ node_modules
 .pytest_cache
 
 build
+dist
 **/assets/grooveproxy
+
+# Exclude built python files
+**/*.so
