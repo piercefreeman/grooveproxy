@@ -1,9 +1,9 @@
 from uuid import uuid4
 
 from bs4 import BeautifulSoup
-from groove.tests.mock_server import MockPageDefinition, mock_server
 
 from groove.proxy import CacheModeEnum
+from groove.tests.mock_server import MockPageDefinition, mock_server
 
 
 def test_cache_off(proxy, browser):

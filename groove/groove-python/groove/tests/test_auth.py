@@ -1,17 +1,13 @@
-from bs4 import BeautifulSoup
 from base64 import b64encode
+
 import pytest
+from bs4 import BeautifulSoup
 from playwright._impl._api_types import Error as PlaywrightError
 from requests import get
-from groove.assets import get_asset_path
 
-from groove.proxy import (
-    Groove,
-    TapeRecord,
-    TapeRequest,
-    TapeResponse,
-    TapeSession,
-)
+from groove.assets import get_asset_path
+from groove.proxy import (Groove, TapeRecord, TapeRequest, TapeResponse,
+                          TapeSession)
 
 AUTH_USERNAME = "test-username"
 AUTH_PASSWORD = "test-password"

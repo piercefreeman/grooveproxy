@@ -4,12 +4,14 @@ from enum import Enum
 from gzip import compress, decompress
 from json import dumps, loads
 from subprocess import Popen
+from sysconfig import get_config_var
 from time import sleep
 from urllib.parse import urljoin
 
-from groove.assets import get_asset_path
 from pydantic import BaseModel, validator
 from requests import Session
+
+from groove.assets import get_asset_path
 
 
 class CacheModeEnum(Enum):
@@ -100,8 +102,6 @@ class Groove:
     @contextmanager
     def launch(self):
         parameters = {
-            "--ca-certificate": get_asset_path("ssl/ca.crt"),
-            "--ca-key": get_asset_path("ssl/ca.key"),
             "--port": self.port,
             "--control-port": self.control_port,
             "--proxy-server": self.proxy_server,
@@ -116,7 +116,7 @@ class Groove:
 
         process = Popen(
             [
-                str(get_asset_path("grooveproxy")),
+                self.executable_path,
                 *[
                     str(item)
                     for key, value in parameters.items()
@@ -161,3 +161,15 @@ class Groove:
             )
         )
         assert response.json()["success"] == True
+
+    @property
+    def executable_path(self) -> str:
+        # Support statically and dynamically build libraries
+        if (path := get_asset_path("grooveproxy")).exists():
+            return str(path)
+
+        wheel_extension = get_config_var("EXT_SUFFIX")
+        if (path := get_asset_path(f"grooveproxy{wheel_extension}")).exists():
+            return exit(path)
+
+        raise ValueError("No groove executable file found")

@@ -1,9 +1,10 @@
 [tool.poetry]
 name = "groove"
-version = "0.1.0"
+version = "0.1.1"
 description = ""
 authors = ["Pierce Freeman <pierce@freeman.vc>"]
 readme = "README.md"
+include = ["proxy"]
 
 [tool.poetry.dependencies]
 python = "^3.10"
@@ -19,6 +20,14 @@ fastapi = "^0.85.1"
 uvicorn = "^0.18.3"
 isort = "^5.10.1"
 watchdog = "^2.1.9"
+
+[tool.poetry.scripts]
+install-ca = "groove.cli:install_ca"
+
+[tool.poetry.build]
+# Custom builder until Poetry expands their build plugin support: https://github.com/python-poetry/poetry/issues/2740
+generate-setup-file = false
+script = "build.py"
 
 [build-system]
 requires = ["poetry-core"]

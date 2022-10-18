@@ -1,7 +1,7 @@
 import pytest
+from playwright.sync_api import sync_playwright
 
 from groove.proxy import Groove
-from playwright.sync_api import sync_playwright
 
 
 # We want this to recreate by default on every unit test to clear the state

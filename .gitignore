@@ -1,4 +1,4 @@
-__pycache__
+.DS_Store
 
 node_modules
 
@@ -17,4 +17,9 @@ node_modules
 .pytest_cache
 
 build
+dist
 **/assets/grooveproxy
+
+# Exclude built python files
+**/*.so
+__pycache__

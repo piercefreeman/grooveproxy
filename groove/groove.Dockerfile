@@ -39,9 +39,12 @@ RUN cd groove-python && poetry install --no-interaction
 RUN apt-get install -y libnss3-tools
 RUN mkdir -p $HOME/.pki/nssdb
 
-# Install the dependent packages and root certificates
+# Install the dependent packages
 RUN ./setup.sh
 RUN ./build.sh
+
+# Install the root certificates
+RUN cd proxy && go run . install-ca
 
 RUN cd groove-python && poetry run playwright install-deps chromium
 RUN cd groove-python && poetry run playwright install chromium
