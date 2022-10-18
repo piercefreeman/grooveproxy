@@ -20,6 +20,9 @@ uvicorn = "^0.18.3"
 isort = "^5.10.1"
 watchdog = "^2.1.9"
 
+[tool.poetry.scripts]
+install-ca = "groove.cli:install_ca"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
