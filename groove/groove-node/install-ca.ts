@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import Proxy from './index';
 import { exec } from 'child_process';
 import { promisify } from 'util';

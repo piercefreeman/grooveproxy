@@ -1,4 +1,7 @@
 import fetch, { RequestInit } from 'node-fetch';
+import { HttpsProxyAgent } from 'https-proxy-agent';
+import { request, RequestOptions } from 'https';
+
 
 interface FetchTimeoutConfiguration extends RequestInit {
     timeout?: number;
@@ -40,3 +43,40 @@ export const streamToBuffer = (stream: any) : Promise<Buffer> => {
         stream.on("error", (err: Error) => reject(err));
     });
 } 
+
+/**
+ * @param {import('./index').default} proxy - proxy instance
+ * @param {RequestOptions?} configuration - configuration for the request
+ */
+export const fetchWithProxy = async (url: string, proxy: any, configuration: any) : Promise<string> => {
+    /*
+     * Helper method to fetch through the proxy while respecting the locally signed certificates
+     * For the configuration paramter pass anything that would normally be passed to `https.request`
+     */
+    const agent = new HttpsProxyAgent(proxy.baseUrlProxy);
+
+    return new Promise((resolve, reject) => {
+        request(
+            url,
+            {
+                agent,
+                ca: proxy.certificate,
+                ...(configuration || {}),
+            },
+            (response: any) => {
+            let data = "";
+
+            response.on("data", (chunk: any) => {
+                data = data + chunk.toString();
+            });
+          
+            response.on("end", () => {
+                resolve(data);
+            });
+
+            response.on("error", (error: Error) => {
+                reject(error);
+            });
+        }).end();
+    });
+}
