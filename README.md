@@ -9,7 +9,7 @@ Groove is an opinionated proxy server built for web crawling and unit test mocki
 - Record and replay requests made to outgoing servers. Recreate testing flows in unit tests while separating them from crawling business logic.
 - 3rd party proxy support for commercial proxies.
 - Custom TLS Hello Client support to maintain a Chromium-like TLS handshake while intercepting requests and re-forwarding on packets.
-- API client in Python (and Node pending).
+- API clients for Python and Node.
 
 ## Proxy Benchmarks
 
