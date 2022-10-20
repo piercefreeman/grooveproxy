@@ -37,11 +37,6 @@ func main() {
 		caCertificate = flag.String("ca-certificate", "", "Path to CA Certificate")
 		caKey         = flag.String("ca-key", "", "Path to CA Key")
 
-		// Proxy settings for 3rd party proxies
-		proxyServer   = flag.String("proxy-server", "", "3rd party proxy http server")
-		proxyUsername = flag.String("proxy-username", "", "3rd party proxy username")
-		proxyPassword = flag.String("proxy-password", "", "3rd party proxy password")
-
 		// Require authentication to access this proxy
 		//authUsername = flag.String("auth-username", "", "Require authentication to the current server")
 		//authPassword = flag.String("auth-password", "", "Require authentication to the current server")
@@ -63,8 +58,6 @@ func main() {
 		}
 	}
 
-	controller := createController(recorder, cache)
-
 	proxy := goproxy.NewProxyHttpServer()
 	proxy.Verbose = *verbose
 
@@ -85,9 +78,10 @@ func main() {
 
 	// Fingerprint mimic logic
 	roundTripper := newRoundTripper()
-	if len(*proxyServer) > 0 {
-		setupEndProxyMiddleware(proxy, roundTripper, *proxyServer, *proxyUsername, *proxyPassword)
-	}
+	endProxy := newEndProxy(proxy)
+	endProxy.setupMiddleware(roundTripper)
+
+	controller := createController(recorder, cache, endProxy)
 
 	proxy.RoundTripper = http.RoundTripper(roundTripper)
 

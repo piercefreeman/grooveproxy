@@ -31,8 +31,6 @@ def test_end_proxy(end_proxy, middle_proxy, browser):
     """
     Ensure the proxy can forward to an end proxy
     """
-    middle_proxy.proxy_server = end_proxy.base_url_proxy
-
     record = TapeRecord(
         request=TapeRequest(
             url="https://freeman.vc:443/",
@@ -49,6 +47,8 @@ def test_end_proxy(end_proxy, middle_proxy, browser):
 
     with middle_proxy.launch():
         with end_proxy.launch():
+            middle_proxy.end_proxy_start(end_proxy.base_url_proxy)
+
             end_proxy.tape_load(
                 TapeSession(
                     records=[

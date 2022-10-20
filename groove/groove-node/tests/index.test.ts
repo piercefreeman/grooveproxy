@@ -1,4 +1,4 @@
-const { default: Groove, CacheModeEnum } = require("../index");
+const { Groove, CacheModeEnum } = require("../index");
 const { fetchWithProxy } = require("../utilities");
 
 describe('testing proxy client', () => {

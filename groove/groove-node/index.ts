@@ -14,27 +14,27 @@ export const CacheModeEnum = {
     AGGRESSIVE: 2
 }
 
-interface GrooveConfiguration {
+export interface GrooveConfiguration {
     commandTimeout?: number;
     port?: number;
     controlPort?: number;
-    proxyServer?: string;
-    proxyUsername?: string;
-    proxyPassword?: string;
     authUsername?: string;
     authPassword?: string;
 }
 
-class Groove {
+export interface EndProxyOptions {
+    server: string;
+    username?: string;
+    password?: string;
+}
+
+export class Groove {
     process: any
     executablePath: string | null
 
     commandTimeout: number
     port: number
     controlPort: number
-    proxyServer: string | null
-    proxyUsername: string | null
-    proxyPassword: string | null
     authUsername: string | null
     authPassword: string | null
 
@@ -46,6 +46,9 @@ class Groove {
     // If true, will not pass through logs. Default to false.
     silenceLogs: boolean;
 
+    // If true, we have already launched the proxy server.
+    launched: boolean;
+
     constructor(config: GrooveConfiguration) {
         this.process = null;
         this.executablePath = null;
@@ -53,30 +56,26 @@ class Groove {
         this.commandTimeout = config.commandTimeout || 5000;
         this.port = config.port || 6010;
         this.controlPort = config.controlPort || 6011;
-        this.proxyServer = config.proxyServer || null;
-        this.proxyUsername = config.proxyUsername || null;
-        this.proxyPassword = config.proxyPassword || null;
         this.authUsername = config.authUsername || null;
         this.authPassword = config.authPassword || null;
-        this.silenceLogs = false;
 
         this.baseUrlProxy = `http://localhost:${this.port}`
         this.baseUrlControl = `http://localhost:${this.controlPort}`
 
         this.certificate = readFileSync(join(homedir(), '.grooveproxy/ca.crt'));
+
+        this.silenceLogs = false;
+        this.launched = false;
     }
 
     async launch() {
-        if (this.process != null) {
+        if (this.launched) {
             throw Error("Already spawned proxy.")
         }
 
         const parameters = {
             "--port": this.port ? this.port.toString() : null,
             "--control-port": this.controlPort ? this.controlPort.toString() : null,
-            "--proxy-server": this.proxyServer,
-            "--proxy-username": this.proxyUsername,
-            "--proxy-password": this.proxyPassword,
             "--auth-username": this.authUsername,
             "--auth-password": this.authPassword,
         }
@@ -91,6 +90,7 @@ class Groove {
                 return previous;
             }, [])
         );
+        this.launched = true;
 
         this.process.stdout.setEncoding('utf8');
         this.process.stdout.on('data', (data: string) => {
@@ -121,6 +121,8 @@ class Groove {
     async stop() {
         this.silenceLogs = true;
         if (this.process) this.process.kill();
+        this.launched = false;
+        this.process = null;
     }
 
     async tapeStart() {
@@ -199,6 +201,35 @@ class Groove {
         }
     }
 
+    async endProxyStart(options: EndProxyOptions) {
+        const response = await fetchWithTimeout(
+            `${this.baseUrlControl}/api/proxy/start`,
+            {
+                method: "POST",
+                timeout: this.commandTimeout,
+                body: JSON.stringify(options),
+            }
+        )
+        const contents = await response.json() as any;
+        if (contents["success"] != true) {
+            throw Error("Failed to start end proxy.")
+        }
+    }
+
+    async endProxyStop() {
+        const response = await fetchWithTimeout(
+            `${this.baseUrlControl}/api/proxy/stop`,
+            {
+                method: "POST",
+                timeout: this.commandTimeout,
+            }
+        )
+        const contents = await response.json() as any;
+        if (contents["success"] != true) {
+            throw Error("Failed to stop end proxy.")
+        }
+    }
+
     async getExecutablePath() {
         if (this.executablePath) return this.executablePath;
 
@@ -215,5 +246,3 @@ class Groove {
         return this.executablePath
     }
 }
-
-export default Groove;

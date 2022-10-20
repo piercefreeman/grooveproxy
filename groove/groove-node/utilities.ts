@@ -45,7 +45,7 @@ export const streamToBuffer = (stream: any) : Promise<Buffer> => {
 } 
 
 /**
- * @param {import('./index').default} proxy - proxy instance
+ * @param {import('./index').Groove} proxy - proxy instance
  * @param {RequestOptions?} configuration - configuration for the request
  */
 export const fetchWithProxy = async (url: string, proxy: any, configuration: any) : Promise<string> => {

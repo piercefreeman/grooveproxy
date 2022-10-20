@@ -20,6 +20,9 @@ extensions = [
         #"groove",
         "groove.assets.grooveproxy",
         # Assume we have temporarily copied over the proxy folder into our current path
+        # We don't want it to be referenced in the actual parent library, since we need to bundle
+        # it alongside the python project in sdist in case clients need to build from source
+        # when wheels aren't available.
         "./proxy",
     )
 ]
