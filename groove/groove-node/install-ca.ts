@@ -1,9 +1,11 @@
-import Proxy from './index';
+#!/usr/bin/env node
+
+import { Groove } from './index';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
 const main = async () => {
-    const proxy = new Proxy({});
+    const proxy = new Groove({});
     const executable = await proxy.getExecutablePath();
 
     try {

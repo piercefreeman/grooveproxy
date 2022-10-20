@@ -78,9 +78,6 @@ class Groove:
         command_timeout: int = 5,
         port: int = 6010,
         control_port: int = 6011,
-        proxy_server: str | None = None,
-        proxy_username: str | None = None,
-        proxy_password: str | None = None,
         auth_username: str | None = None,
         auth_password: str | None = None,
     ):
@@ -88,9 +85,6 @@ class Groove:
 
         self.port = port
         self.control_port = control_port
-        self.proxy_server = proxy_server
-        self.proxy_username = proxy_username
-        self.proxy_password = proxy_password
         self.auth_username = auth_username
         self.auth_password = auth_password
 
@@ -104,9 +98,6 @@ class Groove:
         parameters = {
             "--port": self.port,
             "--control-port": self.control_port,
-            "--proxy-server": self.proxy_server,
-            "--proxy-username": self.proxy_username,
-            "--proxy-password": self.proxy_password,
             "--auth-username": self.auth_username,
             "--auth-password": self.auth_password,
         }
@@ -162,6 +153,28 @@ class Groove:
         )
         assert response.json()["success"] == True
 
+    def end_proxy_start(
+        self,
+        proxy_server: str,
+        proxy_username: str | None = None,
+        proxy_password: str | None = None,
+    ):
+        response = self.session.post(
+            urljoin(self.base_url_control, "/api/proxy/start"),
+            json=dict(
+                server=proxy_server,
+                username=proxy_username,
+                password=proxy_password,
+            )
+        )
+        assert response.json()["success"] == True
+
+    def end_proxy_stop(self):
+        response = self.session.post(
+            urljoin(self.base_url_control, "/api/proxy/stop"),
+        )
+        assert response.json()["success"] == True
+        
     @property
     def executable_path(self) -> str:
         # Support statically and dynamically build libraries

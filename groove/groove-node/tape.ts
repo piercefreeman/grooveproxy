@@ -1,20 +1,20 @@
 import { gunzipSync, gzipSync } from "zlib";
 
 
-interface TapeRequest {
+export interface TapeRequest {
     url: string
     method: string
     headers: Record<string, string[]>
     body: Buffer
 }
 
-interface TapeResponse {
+export interface TapeResponse {
     status: number
     headers: Record<string, string[]>
     body: Buffer
 }
 
-interface TapeRecord {
+export interface TapeRecord {
     request: TapeRequest
     response: TapeResponse
 }
@@ -22,8 +22,8 @@ interface TapeRecord {
 export class TapeSession {
     records: TapeRecord[];
 
-    constructor() {
-        this.records = [];
+    constructor(records?: TapeRecord[]) {
+        this.records = records || [];
     }
 
     async readFromServer(contents: Buffer) {

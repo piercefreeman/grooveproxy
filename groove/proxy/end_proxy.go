@@ -4,11 +4,24 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 
 	goproxy "github.com/piercefreeman/goproxy"
 )
+
+type EndProxy struct {
+	proxy *goproxy.ProxyHttpServer
+
+	// Sets a dial function for use when the proxy is set
+	// When ProxyDial is non-nil, the built-in dialer will attempt to pass the dial through
+	// the proxy. Otherwise it will use the normal dialer.
+	ProxyDial func(network, addr string) (net.Conn, error)
+
+	// Sets an optional request function callback when the proxy is set
+	RequestFunction func(req *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response)
+}
 
 const ProxyAuthHeader = "Proxy-Authorization"
 
@@ -20,20 +33,27 @@ func basicAuth(username, password string) string {
 	return base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
 }
 
-func setupEndProxyMiddleware(
-	proxy *goproxy.ProxyHttpServer,
-	roundTripper *roundTripper,
-	proxyUrl string,
-	username string,
-	password string,
-) {
+func newEndProxy(proxy *goproxy.ProxyHttpServer) *EndProxy {
+	return &EndProxy{
+		proxy: proxy,
+	}
+}
+
+func (endproxy *EndProxy) disableProxy() {
+	endproxy.proxy.Tr.Proxy = nil
+	endproxy.ProxyDial = nil
+	endproxy.RequestFunction = nil
+}
+
+func (endproxy *EndProxy) updateProxy(proxyUrl string, username string, password string) {
 	/*
 	 * To create a end proxy connection without username and password, pass a blank
 	 * string for these values.
 	 */
-	proxy.Tr.Proxy = func(req *http.Request) (*url.URL, error) {
+	endproxy.proxy.Tr.Proxy = func(req *http.Request) (*url.URL, error) {
 		return url.Parse(proxyUrl)
 	}
+
 	if len(username) > 0 && len(password) > 0 {
 		log.Println("Continuing with authenticated end proxy...")
 
@@ -41,16 +61,39 @@ func setupEndProxyMiddleware(
 			log.Printf("Will set basic auth %s %s\n", username, password)
 			SetBasicAuth(username, password, req)
 		}
-		proxy.ConnectDial = proxy.NewConnectDialToProxyWithHandler(proxyUrl, connectReqHandler)
-		roundTripper.Dialer = proxy.NewConnectDialToProxyWithHandler(proxyUrl, connectReqHandler)
-		proxy.OnRequest().Do(goproxy.FuncReqHandler(func(req *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
+		endproxy.ProxyDial = endproxy.proxy.NewConnectDialToProxyWithHandler(proxyUrl, connectReqHandler)
+
+		endproxy.RequestFunction = func(req *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
 			log.Printf("Will set basic auth request %s %s\n", username, password)
 			SetBasicAuth(username, password, req)
 			return req, nil
-		}))
+		}
+
 	} else {
 		log.Println("Continuing with unauthenticated end proxy...")
-		proxy.ConnectDial = proxy.NewConnectDialToProxy(proxyUrl)
-		roundTripper.Dialer = proxy.NewConnectDialToProxy(proxyUrl)
+		endproxy.ProxyDial = endproxy.proxy.NewConnectDialToProxy(proxyUrl)
+		endproxy.RequestFunction = nil
+	}
+}
+
+func (endproxy *EndProxy) setupMiddleware(roundTripper *roundTripper) {
+	endproxy.proxy.OnRequest().Do(goproxy.FuncReqHandler(func(req *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
+		if endproxy.RequestFunction != nil {
+			return endproxy.RequestFunction(req, ctx)
+		}
+		return req, nil
+	}))
+
+	endproxy.proxy.ConnectDial = endproxy.dynamicEndDialer
+	roundTripper.Dialer = endproxy.dynamicEndDialer
+}
+
+func (endproxy *EndProxy) dynamicEndDialer(network, addr string) (net.Conn, error) {
+	// If proxy is set, route to proxy
+	// otherwise use typical network dialer
+	if endproxy.ProxyDial != nil {
+		return endproxy.ProxyDial(network, addr)
+	} else {
+		return net.Dial(network, addr)
 	}
 }

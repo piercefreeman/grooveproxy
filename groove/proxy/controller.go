@@ -13,7 +13,13 @@ type CacheModeRequest struct {
 	Mode int `json:"mode"`
 }
 
-func createController(recorder *Recorder, cache *Cache) *gin.Engine {
+type ProxyRequest struct {
+	Server   string `json:"server"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+func createController(recorder *Recorder, cache *Cache, endProxy *EndProxy) *gin.Engine {
 	router := gin.Default()
 	router.POST("/api/tape/record", func(c *gin.Context) {
 		// Start to record the requests, nullifying any ones from an old session
@@ -81,6 +87,33 @@ func createController(recorder *Recorder, cache *Cache) *gin.Engine {
 		if cache.mode == CacheModeOff {
 			cache.Clear()
 		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+		})
+	})
+
+	router.POST("/api/proxy/start", func(c *gin.Context) {
+		var request ProxyRequest
+		err := json.NewDecoder(c.Request.Body).Decode(&request)
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"error":   err,
+			})
+			return
+		}
+
+		endProxy.updateProxy(request.Server, request.Username, request.Password)
+
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+		})
+	})
+
+	router.POST("/api/proxy/stop", func(c *gin.Context) {
+		endProxy.disableProxy()
 
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,

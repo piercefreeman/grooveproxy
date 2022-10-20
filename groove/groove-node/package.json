@@ -14,8 +14,10 @@
     "build": "tsc",
     "lint": "eslint .",
     "prepare": "npm run build",
-    "test": "jest .",
-    "install-ca": "node dist/install-ca.js"
+    "test": "jest ."
+  },
+  "bin": {
+    "install-ca": "dist/install-ca.js"
   },
   "author": "",
   "license": "MIT",

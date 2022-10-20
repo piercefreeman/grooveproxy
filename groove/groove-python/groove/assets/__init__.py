@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from pkg_resources import resource_filename
+from importlib.resources import files
 
 
 def get_asset_path(asset_name: str) -> Path:
-    return Path(resource_filename(__name__, asset_name))
+    return Path(files(__name__) / asset_name)
