@@ -28,6 +28,18 @@ export interface EndProxyOptions {
     password?: string;
 }
 
+const checkStatus = async (response: any, echoError: string) => {
+    if (response.status > 300 || response.status < 200) {
+        console.log(`Error: ${response.status}: ${await response.text()}`)
+        throw Error(echoError)
+    }
+
+    const contents = await response.json() as any;
+    if (contents["success"] != true) {
+        throw Error(echoError)
+    }
+}
+
 export class Groove {
     process: any
     executablePath: string | null
@@ -133,10 +145,7 @@ export class Groove {
                 timeout: this.commandTimeout,
             }
         )
-        const contents = await response.json() as any;
-        if (contents["success"] != true) {
-            throw Error("Failed to start recording.")
-        }
+        await checkStatus(response, "Failed to start recording.");
     }
 
     async tapeGet() : Promise<TapeSession> {
@@ -166,10 +175,7 @@ export class Groove {
                 body: formData,
             }
         )
-        const contents = await response.json() as any;
-        if (contents["success"] != true) {
-            throw Error("Failed to load tape.")
-        }
+        await checkStatus(response, "Failed to load tape.");
     }
 
     async tapeStop() {
@@ -180,10 +186,7 @@ export class Groove {
                 timeout: this.commandTimeout,
             }
         )
-        const contents = await response.json() as any;
-        if (contents["success"] != true) {
-            throw Error("Failed to stop recording.")
-        }
+        await checkStatus(response, "Failed to stop recording.");
     }
 
     async setCacheMode(mode: number) {
@@ -195,10 +198,7 @@ export class Groove {
                 body: JSON.stringify({ mode }),
             }
         )
-        const contents = await response.json() as any;
-        if (contents["success"] != true) {
-            throw Error("Failed to set cache mode.")
-        }
+        await checkStatus(response, "Failed to set cache mode.");
     }
 
     async endProxyStart(options: EndProxyOptions) {
@@ -210,10 +210,8 @@ export class Groove {
                 body: JSON.stringify(options),
             }
         )
-        const contents = await response.json() as any;
-        if (contents["success"] != true) {
-            throw Error("Failed to start end proxy.")
-        }
+
+        await checkStatus(response, "Failed to start end-proxy.")
     }
 
     async endProxyStop() {
@@ -224,10 +222,7 @@ export class Groove {
                 timeout: this.commandTimeout,
             }
         )
-        const contents = await response.json() as any;
-        if (contents["success"] != true) {
-            throw Error("Failed to stop end proxy.")
-        }
+        await checkStatus(response, "Failed to stop end-proxy.")
     }
 
     async getExecutablePath() {

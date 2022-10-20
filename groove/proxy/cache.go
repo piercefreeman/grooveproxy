@@ -187,9 +187,9 @@ func setupCacheMiddleware(proxy *goproxy.ProxyHttpServer, cache *Cache, recorder
 
 			// If we got here, we couldn't immediately resolve the cache
 			// Determine if we have permission to proceed for this URL
-			log.Println("Will acquire lock")
+			log.Printf("Will acquire lock: %s\n", r.URL.String())
 			cache.AcquireRequestLock(r.URL.String())
-			log.Println("Did acquire lock")
+			log.Printf("Did acquire lock: %s\n", r.URL.String())
 
 			// We now have permission to access this URL and should continue until complete
 			return r, nil
@@ -216,7 +216,9 @@ func setupCacheMiddleware(proxy *goproxy.ProxyHttpServer, cache *Cache, recorder
 				response := responseHistory[i]
 
 				cache.SetValidCacheContents(request, response)
+				log.Printf("Will release lock: %s\n", request.URL.String())
 				cache.ReleaseRequestLock(request.URL.String())
+				log.Printf("Did release lock: %s\n", request.URL.String())
 			}
 
 			return response
