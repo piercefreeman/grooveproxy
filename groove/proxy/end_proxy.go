@@ -1,26 +1,21 @@
 package main
 
 import (
+	"bufio"
+	"crypto/tls"
 	"encoding/base64"
+	"errors"
 	"fmt"
-	"log"
+	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
-
-	goproxy "github.com/piercefreeman/goproxy"
+	"strings"
 )
 
-type EndProxy struct {
-	proxy *goproxy.ProxyHttpServer
-
-	// Sets a dial function for use when the proxy is set
-	// When ProxyDial is non-nil, the built-in dialer will attempt to pass the dial through
-	// the proxy. Otherwise it will use the normal dialer.
-	ProxyDial func(network, addr string) (net.Conn, error)
-
-	// Sets an optional request function callback when the proxy is set
-	RequestFunction func(req *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response)
+var defaultTLSConfig = &tls.Config{
+	InsecureSkipVerify: true,
 }
 
 const ProxyAuthHeader = "Proxy-Authorization"
@@ -33,67 +28,96 @@ func basicAuth(username, password string) string {
 	return base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
 }
 
-func newEndProxy(proxy *goproxy.ProxyHttpServer) *EndProxy {
-	return &EndProxy{
-		proxy: proxy,
-	}
-}
-
-func (endproxy *EndProxy) disableProxy() {
-	endproxy.proxy.Tr.Proxy = nil
-	endproxy.ProxyDial = nil
-	endproxy.RequestFunction = nil
-}
-
-func (endproxy *EndProxy) updateProxy(proxyUrl string, username string, password string) {
+func NewConnectDialToProxyWithHandler(https_proxy string, connectReqHandler func(req *http.Request)) func(network, addr string) (net.Conn, error) {
 	/*
-	 * To create a end proxy connection without username and password, pass a blank
-	 * string for these values.
+	 * This is a modified version of the goproxy.ConnectDialToProxyWithHandler to use the raw
+	 * network dialer instead of a modified version.
 	 */
-	endproxy.proxy.Tr.Proxy = func(req *http.Request) (*url.URL, error) {
-		return url.Parse(proxyUrl)
+	u, err := url.Parse(https_proxy)
+	if err != nil {
+		return nil
 	}
-
-	if len(username) > 0 && len(password) > 0 {
-		log.Println("Continuing with authenticated end proxy...")
-
-		connectReqHandler := func(req *http.Request) {
-			log.Printf("Will set basic auth %s %s\n", username, password)
-			SetBasicAuth(username, password, req)
+	if u.Scheme == "" || u.Scheme == "http" {
+		if strings.IndexRune(u.Host, ':') == -1 {
+			u.Host += ":80"
 		}
-		endproxy.ProxyDial = endproxy.proxy.NewConnectDialToProxyWithHandler(proxyUrl, connectReqHandler)
-
-		endproxy.RequestFunction = func(req *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
-			log.Printf("Will set basic auth request %s %s\n", username, password)
-			SetBasicAuth(username, password, req)
-			return req, nil
+		return func(network, addr string) (net.Conn, error) {
+			connectReq := &http.Request{
+				Method: "CONNECT",
+				URL:    &url.URL{Opaque: addr},
+				Host:   addr,
+				Header: make(http.Header),
+			}
+			if connectReqHandler != nil {
+				connectReqHandler(connectReq)
+			}
+			c, err := net.Dial(network, u.Host)
+			if err != nil {
+				return nil, err
+			}
+			connectReq.Write(c)
+			// Read response.
+			// Okay to use and discard buffered reader here, because
+			// TLS server will not speak until spoken to.
+			br := bufio.NewReader(c)
+			resp, err := http.ReadResponse(br, connectReq)
+			if err != nil {
+				c.Close()
+				return nil, err
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != 200 {
+				resp, err := ioutil.ReadAll(resp.Body)
+				if err != nil {
+					return nil, err
+				}
+				c.Close()
+				return nil, errors.New("proxy refused connection" + string(resp))
+			}
+			return c, nil
 		}
-
-	} else {
-		log.Println("Continuing with unauthenticated end proxy...")
-		endproxy.ProxyDial = endproxy.proxy.NewConnectDialToProxy(proxyUrl)
-		endproxy.RequestFunction = nil
 	}
-}
-
-func (endproxy *EndProxy) setupMiddleware(roundTripper *roundTripper) {
-	endproxy.proxy.OnRequest().Do(goproxy.FuncReqHandler(func(req *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
-		if endproxy.RequestFunction != nil {
-			return endproxy.RequestFunction(req, ctx)
+	if u.Scheme == "https" || u.Scheme == "wss" {
+		if strings.IndexRune(u.Host, ':') == -1 {
+			u.Host += ":443"
 		}
-		return req, nil
-	}))
-
-	endproxy.proxy.ConnectDial = endproxy.dynamicEndDialer
-	roundTripper.Dialer = endproxy.dynamicEndDialer
-}
-
-func (endproxy *EndProxy) dynamicEndDialer(network, addr string) (net.Conn, error) {
-	// If proxy is set, route to proxy
-	// otherwise use typical network dialer
-	if endproxy.ProxyDial != nil {
-		return endproxy.ProxyDial(network, addr)
-	} else {
-		return net.Dial(network, addr)
+		return func(network, addr string) (net.Conn, error) {
+			c, err := net.Dial(network, u.Host)
+			if err != nil {
+				return nil, err
+			}
+			// TODO: Upgrade to utls dependency
+			c = tls.Client(c, defaultTLSConfig)
+			connectReq := &http.Request{
+				Method: "CONNECT",
+				URL:    &url.URL{Opaque: addr},
+				Host:   addr,
+				Header: make(http.Header),
+			}
+			if connectReqHandler != nil {
+				connectReqHandler(connectReq)
+			}
+			connectReq.Write(c)
+			// Read response.
+			// Okay to use and discard buffered reader here, because
+			// TLS server will not speak until spoken to.
+			br := bufio.NewReader(c)
+			resp, err := http.ReadResponse(br, connectReq)
+			if err != nil {
+				c.Close()
+				return nil, err
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != 200 {
+				body, err := ioutil.ReadAll(io.LimitReader(resp.Body, 500))
+				if err != nil {
+					return nil, err
+				}
+				c.Close()
+				return nil, errors.New("proxy refused connection" + string(body))
+			}
+			return c, nil
+		}
 	}
+	return nil
 }

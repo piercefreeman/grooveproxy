@@ -19,7 +19,7 @@ type ProxyRequest struct {
 	Password string `json:"password"`
 }
 
-func createController(recorder *Recorder, cache *Cache, endProxy *EndProxy) *gin.Engine {
+func createController(recorder *Recorder, cache *Cache, dialerSession *DialerSession) *gin.Engine {
 	router := gin.Default()
 	router.POST("/api/tape/record", func(c *gin.Context) {
 		// Start to record the requests, nullifying any ones from an old session
@@ -93,7 +93,7 @@ func createController(recorder *Recorder, cache *Cache, endProxy *EndProxy) *gin
 		})
 	})
 
-	router.POST("/api/proxy/start", func(c *gin.Context) {
+	/*router.POST("/api/dialer/add", func(c *gin.Context) {
 		var request ProxyRequest
 		err := json.NewDecoder(c.Request.Body).Decode(&request)
 
@@ -110,15 +110,7 @@ func createController(recorder *Recorder, cache *Cache, endProxy *EndProxy) *gin
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,
 		})
-	})
-
-	router.POST("/api/proxy/stop", func(c *gin.Context) {
-		endProxy.disableProxy()
-
-		c.JSON(http.StatusOK, gin.H{
-			"success": true,
-		})
-	})
+	})*/
 
 	return router
 }

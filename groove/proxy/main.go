@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -76,13 +77,49 @@ func main() {
 	// same here for equality in benchmarking
 	proxy.CertStore = NewOptimizedCertStore()
 
-	// Fingerprint mimic logic
-	roundTripper := newRoundTripper()
-	endProxy := newEndProxy(proxy)
-	endProxy.setupMiddleware(roundTripper)
+	dialerSession := NewDialerSession()
 
-	controller := createController(recorder, cache, endProxy)
+	// TODO: Update to a client side configuration
+	resources := make([]string, 0)
+	resources = append(resources, "stylesheet")
 
+	resourceDefinition, _ := NewRequestRequiresDefinition(
+		".*?.(?:txt|json|css|less|js|mjs|cjs|gif|ico|jpe?g|svg|png|webp|mkv|mp4|mpe?g|webm|eot|ttf|woff2?)",
+		resources,
+	)
+
+	dialerSession.AddDialerDefinition(
+		NewDialerDefinition(100, nil, resourceDefinition),
+		//NewDialerDefinition(100, nil, nil),
+	)
+	dialerSession.AddDialerDefinition(
+		NewDialerDefinition(
+			10,
+			&ProxyDefinition{
+				url:      "XXX",
+				username: "XXX",
+				password: "XXX",
+			},
+			nil,
+		),
+	)
+
+	roundTripper := NewCustomRoundTripper(dialerSession)
+
+	// Static function to run a new dial without the context of a particular request
+	// In theory we could just make this static at launch time but we keep it dynamic
+	// in case the `next` logic changes inflight (ie. clients add more proxies with
+	// different priorities, etc) - there are some slight performance impacts to this
+	// approach but it's likely negligible given the overall network latencies
+	proxy.ConnectDial = func(network, addr string) (net.Conn, error) {
+		context := dialerSession.NewDialerContext(nil)
+		dialDefinition := dialerSession.NextDialer(context)
+		return dialDefinition.Dial(network, addr)
+	}
+
+	controller := createController(recorder, cache, dialerSession)
+
+	// Cast the custom roundtripper implementation to a standard http.RoundTripper
 	proxy.RoundTripper = http.RoundTripper(roundTripper)
 
 	if proxy.Verbose {
