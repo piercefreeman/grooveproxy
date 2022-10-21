@@ -20,10 +20,9 @@ type CustomRoundTripper struct {
 	 * - Support utls handshakes with remote server
 	 */
 
-	// Mapping of host->protocol. Note that this is the actual "host" of the dial, might
+	// Mapping of host->handler. Note that this is the actual "host" of the dial, might
 	// be the end host itself or the proxy server.
-	// ProtocolHTTP1 | ProtocolHTTP1TLS | ProtocolHTTP2TLS
-	protocolMap  map[string]int
+	protocolMap  map[string]http.RoundTripper
 	protocolLock sync.RWMutex
 
 	// Dialer session
@@ -38,7 +37,7 @@ const (
 
 func NewCustomRoundTripper(dialerSession *DialerSession) *CustomRoundTripper {
 	return &CustomRoundTripper{
-		protocolMap:   make(map[string]int),
+		protocolMap:   make(map[string]http.RoundTripper),
 		dialerSession: dialerSession,
 	}
 }
@@ -108,65 +107,27 @@ func (rt *CustomRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 		host := dialerDefinition.GetHost(req)
 
 		rt.protocolLock.RLock()
-		protocol, ok := rt.protocolMap[host]
+		handler, ok := rt.protocolMap[host]
 		rt.protocolLock.RUnlock()
 
 		var err error
-		var connection net.Conn
 
 		if !ok {
 			// We don't have a protocol for this host, so we need to figure it out
 			// Note that there can be multiple `solveProtocol` inflight for the same URL
 			// since we don't have a mutex around the host yet
-			protocol, connection, err = rt.solveProtocol(req, dialerDefinition)
+			handler, err = rt.solveTransport(req, dialerDefinition)
 
 			if err != nil {
 				log.Printf("Unable to solve protocol for %s: %s", host, err)
 				return nil, err
 			}
 			rt.protocolLock.Lock()
-			rt.protocolMap[host] = protocol
+			rt.protocolMap[host] = handler
 			rt.protocolLock.Unlock()
-		} else {
-			// Create a new connection with the protocol we know
-			connection, err = dialerDefinition.Dial("tcp", getDialerAddress(req.URL))
-			if err != nil {
-				log.Printf("Unable to create connection for %s: %s", host, err)
-				return nil, err
-			}
-
-			// If we have a TLS connection, we need to perform the handshake and wrap the connection
-			if protocol == ProtocolHTTP1TLS || protocol == ProtocolHTTP2TLS {
-				connection, err = wrapConnectionWithTLS(req.URL, connection)
-				if err != nil {
-					log.Printf("Unable to wrap connection for %s: %s", host, err)
-					return nil, err
-				}
-			}
-		}
-		log.Printf("Using protocol %d for %s", protocol, host)
-
-		// At this point the connection has been established so we don't actually need to dial
-		// for the requests; instead use the cached connection since we know the actual
-		// transport is going to be short lived
-		connectionPassthroughDialer := func(network, addr string) (net.Conn, error) {
-			return connection, nil
-		}
-		connectionPassthroughDialerHTTP2 := func(network, addr string, cfg *tls.Config) (net.Conn, error) {
-			return connection, nil
 		}
 
-		var transport http.RoundTripper
-
-		if protocol == ProtocolHTTP1 {
-			transport = &http.Transport{Dial: connectionPassthroughDialer}
-		} else if protocol == ProtocolHTTP1TLS {
-			transport = &http.Transport{DialTLS: connectionPassthroughDialer}
-		} else if protocol == ProtocolHTTP2TLS {
-			transport = &http2.Transport{DialTLS: connectionPassthroughDialerHTTP2}
-		}
-
-		response, err = transport.RoundTrip(req)
+		response, err = handler.RoundTrip(req)
 
 		// This should be the return contents for the actual page
 		// Allow 200 messages and 300s (redirects)
@@ -175,13 +136,61 @@ func (rt *CustomRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 			responseValid = true
 		} else {
 			log.Printf("Invalid response for %s", host)
-
-			// If the response is not valid, we need to close the connection and try again
-			connection.Close()
 		}
 	}
 
 	return response, nil
+}
+
+func (rt *CustomRoundTripper) solveTransport(
+	request *http.Request,
+	dialerDefinition *DialerDefinition,
+) (http.RoundTripper, error) {
+	// Assume that the protocol will be constant for this given host, which is a reasonable
+	// assumption given the lifespan of the proxy
+	// TODO: Might consider invalidating the transport if we see errors with the connection
+	protocol, _, err := rt.solveProtocol(request, dialerDefinition)
+	log.Printf("Using protocol %d for %s", protocol, request.URL.Host)
+
+	if err != nil {
+		return nil, err
+	}
+
+	mainDialer := func(network, addr string) (net.Conn, error) {
+		// Create a new connection with the protocol we know
+		connection, err := dialerDefinition.Dial("tcp", getDialerAddress(request.URL))
+		if err != nil {
+			log.Printf("Unable to create connection for %s: %s", request.URL.Host, err)
+			return nil, err
+		}
+
+		// If we have a TLS connection, we need to perform the handshake and wrap the connection
+		if protocol == ProtocolHTTP1TLS || protocol == ProtocolHTTP2TLS {
+			connection, err = wrapConnectionWithTLS(request.URL, connection)
+			if err != nil {
+				log.Printf("Unable to wrap connection for %s: %s", request.URL.Host, err)
+				return nil, err
+			}
+		}
+
+		return connection, nil
+	}
+
+	mainDialerHTTP2 := func(network, addr string, cfg *tls.Config) (net.Conn, error) {
+		return mainDialer(network, addr)
+	}
+
+	var transport http.RoundTripper
+
+	if protocol == ProtocolHTTP1 {
+		transport = &http.Transport{Dial: mainDialer}
+	} else if protocol == ProtocolHTTP1TLS {
+		transport = &http.Transport{DialTLS: mainDialer}
+	} else if protocol == ProtocolHTTP2TLS {
+		transport = &http2.Transport{DialTLS: mainDialerHTTP2}
+	}
+
+	return transport, nil
 }
 
 func (rt *CustomRoundTripper) solveProtocol(request *http.Request, dialerDefinition *DialerDefinition) (int, net.Conn, error) {
