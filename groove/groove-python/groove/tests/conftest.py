@@ -15,6 +15,5 @@ def proxy():
 def browser():
     with sync_playwright() as p:
         yield p.chromium.launch(
-            #headless=True,
-            headless=False,
+            headless=True,
         )
