@@ -40,8 +40,11 @@ type CacheEntry struct {
 }
 
 type Cache struct {
-	mode             int // CacheModeOff | CacheModeStandard | CacheModeAggressive
+	mode int // CacheModeOff | CacheModeStandard | CacheModeAggressive
+
 	cacheValues      map[string]*CacheEntry
+	cacheValuesMutex *sync.RWMutex
+
 	inflightRequests map[string]*sync.Mutex
 	lockGeneration   *sync.Mutex
 
@@ -54,6 +57,7 @@ func NewCache() *Cache {
 	return &Cache{
 		mode:               CacheModeStandard,
 		cacheValues:        map[string]*CacheEntry{},
+		cacheValuesMutex:   &sync.RWMutex{},
 		inflightRequests:   map[string]*sync.Mutex{},
 		lockGeneration:     &sync.Mutex{},
 		blockingLocks:      make(map[string]int),
@@ -80,10 +84,12 @@ func (c *Cache) SetValidCacheContents(request *http.Request, response *http.Resp
 	reasons, expires, _ := cachecontrol.CachableResponse(request, response, cachecontrol.Options{})
 
 	if c.mode == CacheModeAggressive || len(reasons) == 0 {
+		c.cacheValuesMutex.Lock()
 		c.cacheValues[request.URL.String()] = &CacheEntry{
 			cacheInvalidation: expires,
 			value:             responseToArchivedResponse(response),
 		}
+		c.cacheValuesMutex.Unlock()
 	}
 }
 
@@ -96,7 +102,9 @@ func (c *Cache) GetCacheContents(url string) *ArchivedResponse {
 	// Only one cache entry appears in the cache at any one time
 	// Determine if this can instantly be retrieved without having to acquire the lock
 	// (allows for slightly faster access in a non-race condition risk way)
+	c.cacheValuesMutex.RLock()
 	cache, ok := c.cacheValues[url]
+	c.cacheValuesMutex.RUnlock()
 
 	if ok {
 		// Determine if the cache is still valid
@@ -186,9 +194,11 @@ func (c *Cache) ReleaseRequestLock(url string) {
 }
 
 func (c *Cache) Clear() {
+	c.cacheValuesMutex.Lock()
 	for key, _ := range c.cacheValues {
 		delete(c.cacheValues, key)
 	}
+	c.cacheValuesMutex.Unlock()
 }
 
 func (c *Cache) cacheEntryValid(cacheEntry *CacheEntry) bool {
