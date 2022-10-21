@@ -2,10 +2,10 @@ from base64 import b64encode
 
 import pytest
 from bs4 import BeautifulSoup
-from playwright.sync_api import sync_playwright
 
-from groove.proxy import (Groove, TapeRecord, TapeRequest, TapeResponse,
-                          TapeSession)
+from groove.proxy import Groove
+from groove.tape import TapeRecord, TapeRequest, TapeResponse, TapeSession
+
 
 AUTH_USERNAME = "test-username"
 AUTH_PASSWORD = "test-password"

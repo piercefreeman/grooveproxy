@@ -3,8 +3,7 @@ from uuid import uuid4
 
 from bs4 import BeautifulSoup
 
-from groove.proxy import TapeRecord, TapeRequest, TapeResponse, TapeSession
-import pytest
+from groove.tape import TapeRecord, TapeRequest, TapeResponse, TapeSession
 
 
 def test_tape(proxy, browser):
@@ -86,20 +85,3 @@ def test_multiple_requests(proxy, browser):
 
     page.goto("https://freeman.vc")
     assert BeautifulSoup(page.content()).text.strip() == response_2
-
-
-@pytest.mark.xfail(reason="TLS certificate blocked", raises=ValueError)
-def test_tls_addons(proxy, browser):
-    """
-    Test TLS addons
-    """
-    context = browser.new_context(
-        proxy={
-            "server": proxy.base_url_proxy,
-        }
-    )
-    page = context.new_page()
-
-    page.goto("https://www.google.com:443/")
-    if not page.ok():
-        raise ValueError()
