@@ -61,7 +61,6 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 func (rt *roundTripper) getTransport(req *http.Request) error {
 	switch strings.ToLower(req.URL.Scheme) {
 	case "http":
-		log.Println("Dial HTTP")
 		rt.transport = &http.Transport{Dial: rt.Dialer}
 		return nil
 	case "https":
@@ -69,7 +68,6 @@ func (rt *roundTripper) getTransport(req *http.Request) error {
 		return fmt.Errorf("meek_lite: invalid URL scheme: '%v'", req.URL.Scheme)
 	}
 
-	log.Println("Dial TLS")
 	_, err := rt.dialTLS("tcp", getDialTLSAddr(req.URL))
 	switch err {
 	case errProtocolNegotiated:
@@ -87,7 +85,6 @@ func (rt *roundTripper) dialTLS(network, addr string) (net.Conn, error) {
 	// Unlike rt.transport, this is protected by a critical section
 	// since past the initial manual call from getTransport, the HTTP
 	// client will be the caller.
-	log.Println("Dial TLS")
 	rt.Lock()
 	defer rt.Unlock()
 
@@ -98,7 +95,6 @@ func (rt *roundTripper) dialTLS(network, addr string) (net.Conn, error) {
 		return conn, nil
 	}
 
-	log.Println("Dialer tls")
 	rawConn, err := rt.Dialer(network, addr)
 	if err != nil {
 		return nil, err
@@ -119,11 +115,13 @@ func (rt *roundTripper) dialTLS(network, addr string) (net.Conn, error) {
 	// use.
 	conn := utls.UClient(rawConn, &utls.Config{ServerName: host}, utls.HelloChrome_Auto)
 	if err = conn.Handshake(); err != nil {
+		log.Println("Handshake failed")
 		conn.Close()
 		return nil, err
 	}
 
 	if rt.transport != nil {
+		log.Println("Transport failed")
 		return conn, nil
 	}
 

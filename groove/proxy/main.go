@@ -110,6 +110,8 @@ func main() {
 	}()
 
 	go func() {
+		// Host on TLS so clients can use http/2 multiplexing - required for the requests
+		// that block the system lock
 		log.Fatalln(http.ListenAndServe(":"+strconv.Itoa(*port), proxy))
 	}()
 

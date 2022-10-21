@@ -44,13 +44,15 @@ func (r *Recorder) LogPair(request *http.Request, response *http.Response) {
 	archivedRequest := requestToArchivedRequest(request)
 	archivedResponse := responseToArchivedResponse(response)
 
-	r.records = append(
-		r.records,
-		&RecordedRecord{
-			Request:  *archivedRequest,
-			Response: *archivedResponse,
-		},
-	)
+	if archivedRequest != nil && archivedResponse != nil {
+		r.records = append(
+			r.records,
+			&RecordedRecord{
+				Request:  *archivedRequest,
+				Response: *archivedResponse,
+			},
+		)
+	}
 }
 
 func (r *Recorder) ExportData() (response *bytes.Buffer, err error) {

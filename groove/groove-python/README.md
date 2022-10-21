@@ -45,6 +45,7 @@ Create a fully fake outbound for testing:
 
 ```python
 from groove.proxy import Groove
+from groove.tape import TapeRecord, TapeRequest, TapeResponse, TapeSession
 from requests import get
 from pathlib import Path
 

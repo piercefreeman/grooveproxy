@@ -44,14 +44,20 @@ type Cache struct {
 	cacheValues      map[string]*CacheEntry
 	inflightRequests map[string]*sync.Mutex
 	lockGeneration   *sync.Mutex
+
+	// Current locks that are blocking on gaining exclusive access to their lock
+	blockingLocks      map[string]int
+	blockingLocksMutex *sync.RWMutex
 }
 
 func NewCache() *Cache {
 	return &Cache{
-		mode:             CacheModeStandard,
-		cacheValues:      map[string]*CacheEntry{},
-		inflightRequests: map[string]*sync.Mutex{},
-		lockGeneration:   &sync.Mutex{},
+		mode:               CacheModeStandard,
+		cacheValues:        map[string]*CacheEntry{},
+		inflightRequests:   map[string]*sync.Mutex{},
+		lockGeneration:     &sync.Mutex{},
+		blockingLocks:      make(map[string]int),
+		blockingLocksMutex: &sync.RWMutex{},
 	}
 }
 
@@ -119,7 +125,6 @@ func (c *Cache) AcquireRequestLock(url string) {
 	// Avoid race condition introduced by adding multiple url-based locks
 	// at the same time
 	c.lockGeneration.Lock()
-	defer c.lockGeneration.Unlock()
 
 	lock, ok := c.inflightRequests[url]
 	if !ok {
@@ -127,7 +132,39 @@ func (c *Cache) AcquireRequestLock(url string) {
 		c.inflightRequests[url] = lock
 	}
 
+	// Explicitly unlock here since we want to unlock it right after getting the main lock
+	c.lockGeneration.Unlock()
+
+	c.blockingLocksMutex.Lock()
+	if _, ok := c.blockingLocks[url]; !ok {
+		c.blockingLocks[url] = 0
+	}
+	c.blockingLocks[url] += 1
+	c.blockingLocksMutex.Unlock()
+
+	c.LogBlockingRequests()
+
 	lock.Lock()
+
+	c.blockingLocksMutex.Lock()
+	c.blockingLocks[url] -= 1
+	c.blockingLocksMutex.Unlock()
+
+	c.LogBlockingRequests()
+}
+
+func (c *Cache) LogBlockingRequests() {
+	c.blockingLocksMutex.RLock()
+
+	log.Println("---BLOCKING REQUESTS---")
+	for count_url, count_values := range c.blockingLocks {
+		if count_values > 0 {
+			log.Printf("Blocking Locks: %s: %d\n", count_url, count_values)
+		}
+	}
+	log.Println("---END---")
+
+	c.blockingLocksMutex.RUnlock()
 }
 
 func (c *Cache) ReleaseRequestLock(url string) {
@@ -187,6 +224,8 @@ func setupCacheMiddleware(proxy *goproxy.ProxyHttpServer, cache *Cache, recorder
 
 			// If we got here, we couldn't immediately resolve the cache
 			// Determine if we have permission to proceed for this URL
+			// FIX: This causes a deadlock right now because these request handling aren't goroutines
+			// therefore they will run inline with the rest of the program and block each other
 			log.Printf("Will acquire lock: %s\n", r.URL.String())
 			cache.AcquireRequestLock(r.URL.String())
 			log.Printf("Did acquire lock: %s\n", r.URL.String())
@@ -201,6 +240,12 @@ func setupCacheMiddleware(proxy *goproxy.ProxyHttpServer, cache *Cache, recorder
 		 * Cache layer
 		 */
 		func(response *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
+			if ctx.Error != nil {
+				request := ctx.Req
+				cache.ReleaseRequestLock(request.URL.String())
+				return nil
+			}
+
 			if recorder.mode == RecorderModeRead {
 				return response
 			}
