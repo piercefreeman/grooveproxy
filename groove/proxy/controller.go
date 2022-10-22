@@ -116,37 +116,46 @@ func createController(recorder *Recorder, cache *Cache, dialerSession *DialerSes
 
 		dialerSession.DialerDefinitions = nil
 
-		for _, request := range requests.Definitions {
-			var requestRequires *RequestRequiresDefinition = nil
-			var proxy *ProxyDefinition = nil
-
-			if request.RequiresUrlRegex != "" || len(request.RequiresResourceTypes) > 0 {
-				requestRequires, err = NewRequestRequiresDefinition(request.RequiresUrlRegex, request.RequiresResourceTypes)
-				if err != nil {
-					c.JSON(http.StatusBadRequest, gin.H{
-						"success": false,
-						"error":   err,
-					})
-					return
-				}
-			}
-
-			if request.ProxyServer != "" {
-				proxy = &ProxyDefinition{
-					url:      request.ProxyServer,
-					username: request.ProxyUsername,
-					password: request.ProxyPassword,
-				}
-			}
-
+		if len(requests.Definitions) == 0 {
+			// If no requests are provided, default to passing through everything
+			// so we're guaranteed to have one valid dialer
 			dialerSession.DialerDefinitions = append(
 				dialerSession.DialerDefinitions,
-				NewDialerDefinition(
-					request.Priority,
-					proxy,
-					requestRequires,
-				),
+				NewDialerDefinition(0, nil, nil),
 			)
+		} else {
+			for _, request := range requests.Definitions {
+				var requestRequires *RequestRequiresDefinition = nil
+				var proxy *ProxyDefinition = nil
+
+				if request.RequiresUrlRegex != "" || len(request.RequiresResourceTypes) > 0 {
+					requestRequires, err = NewRequestRequiresDefinition(request.RequiresUrlRegex, request.RequiresResourceTypes)
+					if err != nil {
+						c.JSON(http.StatusBadRequest, gin.H{
+							"success": false,
+							"error":   err,
+						})
+						return
+					}
+				}
+
+				if request.ProxyServer != "" {
+					proxy = &ProxyDefinition{
+						url:      request.ProxyServer,
+						username: request.ProxyUsername,
+						password: request.ProxyPassword,
+					}
+				}
+
+				dialerSession.DialerDefinitions = append(
+					dialerSession.DialerDefinitions,
+					NewDialerDefinition(
+						request.Priority,
+						proxy,
+						requestRequires,
+					),
+				)
+			}
 		}
 
 		c.JSON(http.StatusOK, gin.H{

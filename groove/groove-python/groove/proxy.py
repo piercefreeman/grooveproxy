@@ -11,7 +11,7 @@ from requests import Session
 from groove.assets import get_asset_path
 from groove.enums import CacheModeEnum
 from groove.tape import TapeSession
-from groove.dialer import DialerDefinition
+from groove.dialer import DialerDefinition, DefaultInternetDialer
 
 
 class ProxyFailureError(Exception):
@@ -99,7 +99,7 @@ class Groove:
         )
         assert response.json()["success"] == True
 
-    def dialers_load(self, dialers: list[DialerDefinition]):
+    def dialer_load(self, dialers: list[DialerDefinition]):
         response = self.session.post(
             urljoin(self.base_url_control, "/api/dialer/load"),
             json=dict(
