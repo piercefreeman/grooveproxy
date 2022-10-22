@@ -11,6 +11,7 @@ from requests import Session
 from groove.assets import get_asset_path
 from groove.enums import CacheModeEnum
 from groove.tape import TapeSession
+from groove.dialer import DialerDefinition
 
 
 class ProxyFailureError(Exception):
@@ -98,28 +99,26 @@ class Groove:
         )
         assert response.json()["success"] == True
 
-    def end_proxy_start(
-        self,
-        proxy_server: str,
-        proxy_username: str | None = None,
-        proxy_password: str | None = None,
-    ):
+    def dialers_load(self, dialers: list[DialerDefinition]):
+        print("WHEE", urljoin(self.base_url_control, "/api/dialer/load"))
         response = self.session.post(
-            urljoin(self.base_url_control, "/api/proxy/start"),
+            urljoin(self.base_url_control, "/api/dialer/load"),
             json=dict(
-                server=proxy_server,
-                username=proxy_username,
-                password=proxy_password,
+                definitions=[
+                    {
+                        "priority": dialer.priority,
+                        "proxy_server": dialer.proxy.url if dialer.proxy is not None else None,
+                        "proxy_username": dialer.proxy.url if dialer.proxy is not None else None,
+                        "proxy_password": dialer.proxy.url if dialer.proxy is not None else None,
+                        "requires_url_regex": dialer.request_requires.url_regex if dialer.request_requires is not None else None,
+                        "requires_resource_types": dialer.request_requires.resource_types if dialer.request_requires is not None else None,
+                    }
+                    for dialer in dialers
+                ],
             )
         )
         assert response.json()["success"] == True
 
-    def end_proxy_stop(self):
-        response = self.session.post(
-            urljoin(self.base_url_control, "/api/proxy/stop"),
-        )
-        assert response.json()["success"] == True
-        
     @property
     def executable_path(self) -> str:
         # Support statically and dynamically build libraries

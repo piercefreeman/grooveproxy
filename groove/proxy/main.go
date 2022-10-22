@@ -79,29 +79,11 @@ func main() {
 
 	dialerSession := NewDialerSession()
 
-	// TODO: Update to a client side configuration
-	resources := make([]string, 0)
-	resources = append(resources, "stylesheet")
-
-	resourceDefinition, _ := NewRequestRequiresDefinition(
-		".*?.(?:txt|json|css|less|js|mjs|cjs|gif|ico|jpe?g|svg|png|webp|mkv|mp4|mpe?g|webm|eot|ttf|woff2?)",
-		resources,
-	)
-
-	dialerSession.AddDialerDefinition(
-		NewDialerDefinition(100, nil, resourceDefinition),
-		//NewDialerDefinition(100, nil, nil),
-	)
-	dialerSession.AddDialerDefinition(
-		NewDialerDefinition(
-			10,
-			&ProxyDefinition{
-				url:      "XXX",
-				username: "XXX",
-				password: "XXX",
-			},
-			nil,
-		),
+	// Default the session to a full passthrough from local -> Internet
+	// This will get overridden by clients when they provide values
+	dialerSession.DialerDefinitions = append(
+		dialerSession.DialerDefinitions,
+		NewDialerDefinition(0, nil, nil),
 	)
 
 	roundTripper := NewCustomRoundTripper(dialerSession)

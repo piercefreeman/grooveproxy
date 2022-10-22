@@ -13,10 +13,19 @@ type CacheModeRequest struct {
 	Mode int `json:"mode"`
 }
 
-type ProxyRequest struct {
-	Server   string `json:"server"`
-	Username string `json:"username"`
-	Password string `json:"password"`
+type DialerDefinitionRequest struct {
+	Priority int `json:"priority"`
+
+	ProxyServer   string `json:"proxy_server"`
+	ProxyUsername string `json:"proxy_username"`
+	ProxyPassword string `json:"proxy_password"`
+
+	RequiresUrlRegex      string   `json:"requires_url_regex"`
+	RequiresResourceTypes []string `json:"requires_resource_types"`
+}
+
+type DialerDefinitionRequests struct {
+	Definitions []DialerDefinitionRequest `json:"definitions"`
 }
 
 func createController(recorder *Recorder, cache *Cache, dialerSession *DialerSession) *gin.Engine {
@@ -93,9 +102,9 @@ func createController(recorder *Recorder, cache *Cache, dialerSession *DialerSes
 		})
 	})
 
-	/*router.POST("/api/dialer/add", func(c *gin.Context) {
-		var request ProxyRequest
-		err := json.NewDecoder(c.Request.Body).Decode(&request)
+	router.POST("/api/dialer/load", func(c *gin.Context) {
+		var requests DialerDefinitionRequests
+		err := json.NewDecoder(c.Request.Body).Decode(&requests)
 
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
@@ -105,12 +114,45 @@ func createController(recorder *Recorder, cache *Cache, dialerSession *DialerSes
 			return
 		}
 
-		endProxy.updateProxy(request.Server, request.Username, request.Password)
+		dialerSession.DialerDefinitions = nil
+
+		for _, request := range requests.Definitions {
+			var requestRequires *RequestRequiresDefinition = nil
+			var proxy *ProxyDefinition = nil
+
+			if request.RequiresUrlRegex != "" || len(request.RequiresResourceTypes) > 0 {
+				requestRequires, err = NewRequestRequiresDefinition(request.RequiresUrlRegex, request.RequiresResourceTypes)
+				if err != nil {
+					c.JSON(http.StatusBadRequest, gin.H{
+						"success": false,
+						"error":   err,
+					})
+					return
+				}
+			}
+
+			if request.ProxyServer != "" {
+				proxy = &ProxyDefinition{
+					url:      request.ProxyServer,
+					username: request.ProxyUsername,
+					password: request.ProxyPassword,
+				}
+			}
+
+			dialerSession.DialerDefinitions = append(
+				dialerSession.DialerDefinitions,
+				NewDialerDefinition(
+					request.Priority,
+					proxy,
+					requestRequires,
+				),
+			)
+		}
 
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,
 		})
-	})*/
+	})
 
 	return router
 }

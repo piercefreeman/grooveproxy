@@ -162,10 +162,11 @@ type DialerSession struct {
 	 * Primary object and storage structure for dial generation. Only one of these should
 	 * be instantiated per groove instance.
 	 */
-	dialerDefinitions []*DialerDefinition
+	DialerDefinitions []*DialerDefinition
 
 	// Attempts allowed in each context to dial a successful connection to the open internet
-	totalTries int
+	// If zero, will try all available dials
+	TotalTries int
 
 	// NOTE: In the future this might store some mapping of
 	// (dialer definition, host) -> success probabilities
@@ -173,18 +174,20 @@ type DialerSession struct {
 
 func NewDialerSession() *DialerSession {
 	return &DialerSession{
-		dialerDefinitions: make([]*DialerDefinition, 0),
+		DialerDefinitions: make([]*DialerDefinition, 0),
+		TotalTries:        0,
 	}
 }
 
-func (session *DialerSession) AddDialerDefinition(dialerDefinition *DialerDefinition) {
-	session.dialerDefinitions = append(session.dialerDefinitions, dialerDefinition)
-}
-
 func (session *DialerSession) NewDialerContext(request *http.Request) *DialerContext {
+	totalTries := session.TotalTries
+	if totalTries == 0 {
+		totalTries = len(session.DialerDefinitions)
+	}
+
 	return &DialerContext{
 		Request:        request,
-		remainingTries: len(session.dialerDefinitions),
+		remainingTries: totalTries,
 	}
 }
 
@@ -194,7 +197,7 @@ func (session *DialerSession) candidateDialers(context *DialerContext) []*Dialer
 	 * param: request - nil if we don't know the request yet, true if we just need to open
 	 * 	a connection over the wire for a non-http protocol like for websockets
 	 */
-	candidateDialers := session.dialerDefinitions
+	candidateDialers := session.DialerDefinitions
 
 	// If request is provided, attempt to filter for the possible dialers
 	if context.Request != nil {
