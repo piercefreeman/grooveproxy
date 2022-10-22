@@ -1,6 +1,5 @@
 from contextlib import contextmanager
 from enum import Enum
-
 from subprocess import Popen
 from sysconfig import get_config_var
 from time import sleep
@@ -9,6 +8,7 @@ from urllib.parse import urljoin
 from requests import Session
 
 from groove.assets import get_asset_path
+from groove.dialer import DefaultInternetDialer, DialerDefinition
 from groove.enums import CacheModeEnum
 from groove.tape import TapeSession
 
@@ -98,28 +98,25 @@ class Groove:
         )
         assert response.json()["success"] == True
 
-    def end_proxy_start(
-        self,
-        proxy_server: str,
-        proxy_username: str | None = None,
-        proxy_password: str | None = None,
-    ):
+    def dialer_load(self, dialers: list[DialerDefinition]):
         response = self.session.post(
-            urljoin(self.base_url_control, "/api/proxy/start"),
+            urljoin(self.base_url_control, "/api/dialer/load"),
             json=dict(
-                server=proxy_server,
-                username=proxy_username,
-                password=proxy_password,
+                definitions=[
+                    {
+                        "priority": dialer.priority,
+                        "proxyServer": dialer.proxy.url if dialer.proxy is not None else None,
+                        "proxyUsername": dialer.proxy.username if dialer.proxy is not None else None,
+                        "proxyPassword": dialer.proxy.password if dialer.proxy is not None else None,
+                        "requiresUrlRegex": dialer.request_requires.url_regex if dialer.request_requires is not None else None,
+                        "requiresResourceTypes": dialer.request_requires.resource_types if dialer.request_requires is not None else None,
+                    }
+                    for dialer in dialers
+                ],
             )
         )
         assert response.json()["success"] == True
 
-    def end_proxy_stop(self):
-        response = self.session.post(
-            urljoin(self.base_url_control, "/api/proxy/stop"),
-        )
-        assert response.json()["success"] == True
-        
     @property
     def executable_path(self) -> str:
         # Support statically and dynamically build libraries

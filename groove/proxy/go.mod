@@ -6,7 +6,8 @@ go 1.18
 
 require (
 	github.com/gin-gonic/gin v1.8.1
-	github.com/piercefreeman/goproxy v0.0.6
+	github.com/google/uuid v1.3.0
+	github.com/piercefreeman/goproxy v0.0.7
 	github.com/pquerna/cachecontrol v0.1.0
 	github.com/refraction-networking/utls v1.1.5
 	golang.org/x/net v0.0.0-20221012135044-0b7e1fb9d458

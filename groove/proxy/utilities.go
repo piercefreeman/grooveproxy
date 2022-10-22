@@ -10,7 +10,29 @@ func reverseSlice[T any](s []T) {
 	}
 }
 
+func filterSlice[T any](s []T, f func(T) bool) []T {
+	filtered := make([]T, 0)
+
+	for _, value := range s {
+		if f(value) {
+			filtered = append(filtered, value)
+		}
+	}
+
+	return filtered
+}
+
 func containsInt(s []int, search int) bool {
+	for _, value := range s {
+		if value == search {
+			return true
+		}
+	}
+
+	return false
+}
+
+func containsString(s []string, search string) bool {
 	for _, value := range s {
 		if value == search {
 			return true

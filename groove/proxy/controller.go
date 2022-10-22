@@ -13,13 +13,22 @@ type CacheModeRequest struct {
 	Mode int `json:"mode"`
 }
 
-type ProxyRequest struct {
-	Server   string `json:"server"`
-	Username string `json:"username"`
-	Password string `json:"password"`
+type DialerDefinitionRequest struct {
+	Priority int `json:"priority"`
+
+	ProxyServer   string `json:"proxyServer"`
+	ProxyUsername string `json:"proxyUsername"`
+	ProxyPassword string `json:"proxyPassword"`
+
+	RequiresUrlRegex      string   `json:"requiresUrlRegex"`
+	RequiresResourceTypes []string `json:"requiresResourceTypes"`
 }
 
-func createController(recorder *Recorder, cache *Cache, endProxy *EndProxy) *gin.Engine {
+type DialerDefinitionRequests struct {
+	Definitions []DialerDefinitionRequest `json:"definitions"`
+}
+
+func createController(recorder *Recorder, cache *Cache, dialerSession *DialerSession) *gin.Engine {
 	router := gin.Default()
 	router.POST("/api/tape/record", func(c *gin.Context) {
 		// Start to record the requests, nullifying any ones from an old session
@@ -93,9 +102,9 @@ func createController(recorder *Recorder, cache *Cache, endProxy *EndProxy) *gin
 		})
 	})
 
-	router.POST("/api/proxy/start", func(c *gin.Context) {
-		var request ProxyRequest
-		err := json.NewDecoder(c.Request.Body).Decode(&request)
+	router.POST("/api/dialer/load", func(c *gin.Context) {
+		var requests DialerDefinitionRequests
+		err := json.NewDecoder(c.Request.Body).Decode(&requests)
 
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
@@ -105,15 +114,49 @@ func createController(recorder *Recorder, cache *Cache, endProxy *EndProxy) *gin
 			return
 		}
 
-		endProxy.updateProxy(request.Server, request.Username, request.Password)
+		dialerSession.DialerDefinitions = nil
 
-		c.JSON(http.StatusOK, gin.H{
-			"success": true,
-		})
-	})
+		if len(requests.Definitions) == 0 {
+			// If no requests are provided, default to passing through everything
+			// so we're guaranteed to have one valid dialer
+			dialerSession.DialerDefinitions = append(
+				dialerSession.DialerDefinitions,
+				NewDialerDefinition(0, nil, nil),
+			)
+		} else {
+			for _, request := range requests.Definitions {
+				var requestRequires *RequestRequiresDefinition = nil
+				var proxy *ProxyDefinition = nil
 
-	router.POST("/api/proxy/stop", func(c *gin.Context) {
-		endProxy.disableProxy()
+				if request.RequiresUrlRegex != "" || len(request.RequiresResourceTypes) > 0 {
+					requestRequires, err = NewRequestRequiresDefinition(request.RequiresUrlRegex, request.RequiresResourceTypes)
+					if err != nil {
+						c.JSON(http.StatusBadRequest, gin.H{
+							"success": false,
+							"error":   err,
+						})
+						return
+					}
+				}
+
+				if request.ProxyServer != "" {
+					proxy = &ProxyDefinition{
+						url:      request.ProxyServer,
+						username: request.ProxyUsername,
+						password: request.ProxyPassword,
+					}
+				}
+
+				dialerSession.DialerDefinitions = append(
+					dialerSession.DialerDefinitions,
+					NewDialerDefinition(
+						request.Priority,
+						proxy,
+						requestRequires,
+					),
+				)
+			}
+		}
 
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,
