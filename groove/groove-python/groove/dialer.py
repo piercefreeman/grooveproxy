@@ -1,18 +1,18 @@
-from pydantic import BaseModel, validator
+from groove.models import GrooveModelBase
 
 
-class RequestRequiresDefinition(BaseModel):
+class RequestRequiresDefinition(GrooveModelBase):
     url_regex: str
     resource_types: list[str]
 
 
-class ProxyDefinition(BaseModel):
+class ProxyDefinition(GrooveModelBase):
     url: str
     username: str | None = None
     password: str | None = None
 
 
-class DialerDefinition(BaseModel):
+class DialerDefinition(GrooveModelBase):
     priority: int
     proxy: ProxyDefinition | None = None
     request_requires: RequestRequiresDefinition | None = None

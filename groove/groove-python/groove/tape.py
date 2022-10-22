@@ -1,9 +1,10 @@
-from pydantic import BaseModel, validator
+from pydantic import validator
 from gzip import compress, decompress
 from json import dumps, loads
 from base64 import b64decode, b64encode
+from groove.models import GrooveModelBase
 
-class TapeRequest(BaseModel):
+class TapeRequest(GrooveModelBase):
     url: str
     method: str
     headers: dict[str, list[str]]
@@ -14,7 +15,7 @@ class TapeRequest(BaseModel):
         return b64decode(value)
 
 
-class TapeResponse(BaseModel):
+class TapeResponse(GrooveModelBase):
     status: int
     headers: dict[str, list[str]]
     body: bytes
@@ -24,7 +25,7 @@ class TapeResponse(BaseModel):
         return b64decode(value)
 
 
-class TapeRecord(BaseModel):
+class TapeRecord(GrooveModelBase):
     request: TapeRequest
     response: TapeResponse
 
@@ -35,7 +36,7 @@ class TapeRecord(BaseModel):
         }
 
 
-class TapeSession(BaseModel):
+class TapeSession(GrooveModelBase):
     records: list[TapeRecord]
 
     @classmethod

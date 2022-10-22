@@ -16,12 +16,12 @@ type CacheModeRequest struct {
 type DialerDefinitionRequest struct {
 	Priority int `json:"priority"`
 
-	ProxyServer   string `json:"proxy_server"`
-	ProxyUsername string `json:"proxy_username"`
-	ProxyPassword string `json:"proxy_password"`
+	ProxyServer   string `json:"proxyServer"`
+	ProxyUsername string `json:"proxyUsername"`
+	ProxyPassword string `json:"proxyPassword"`
 
-	RequiresUrlRegex      string   `json:"requires_url_regex"`
-	RequiresResourceTypes []string `json:"requires_resource_types"`
+	RequiresUrlRegex      string   `json:"requiresUrlRegex"`
+	RequiresResourceTypes []string `json:"requiresResourceTypes"`
 }
 
 type DialerDefinitionRequests struct {

@@ -7,6 +7,7 @@ import { fetchWithTimeout, sleep, streamToBuffer } from './utilities';
 import { TapeSession } from './tape';
 import { homedir } from 'os';
 import FormData from 'form-data';
+import { DialerDefinition } from './dialer';
 
 export const CacheModeEnum = {
 	OFF: 0,
@@ -201,13 +202,26 @@ export class Groove {
         await checkStatus(response, "Failed to set cache mode.");
     }
 
-    async endProxyStart(options: EndProxyOptions) {
+    async dialerLoad(dialers: DialerDefinition[]) {
         const response = await fetchWithTimeout(
-            `${this.baseUrlControl}/api/proxy/start`,
+            `${this.baseUrlControl}/api/dialer/load`,
             {
                 method: "POST",
                 timeout: this.commandTimeout,
-                body: JSON.stringify(options),
+                body: JSON.stringify(
+                    {
+                        definitions: dialers.map(
+                            (dialer) => ({
+                                priority: dialer.priority,
+                                proxyServer: dialer.proxy ? dialer.proxy.url : null,
+                                proxyUsername: dialer.proxy ? dialer.proxy.username : null,
+                                proxyPassword: dialer.proxy ? dialer.proxy.password : null,
+                                requiresUrlRegex: dialer.requestRequires ? dialer.requestRequires.urlRegex : null,
+                                requiresResourceTypes: dialer.requestRequires ? dialer.requestRequires.resourceTypes : null,
+                            })
+                        )
+                    }
+                ),
             }
         )
 

@@ -100,18 +100,17 @@ class Groove:
         assert response.json()["success"] == True
 
     def dialers_load(self, dialers: list[DialerDefinition]):
-        print("WHEE", urljoin(self.base_url_control, "/api/dialer/load"))
         response = self.session.post(
             urljoin(self.base_url_control, "/api/dialer/load"),
             json=dict(
                 definitions=[
                     {
                         "priority": dialer.priority,
-                        "proxy_server": dialer.proxy.url if dialer.proxy is not None else None,
-                        "proxy_username": dialer.proxy.url if dialer.proxy is not None else None,
-                        "proxy_password": dialer.proxy.url if dialer.proxy is not None else None,
-                        "requires_url_regex": dialer.request_requires.url_regex if dialer.request_requires is not None else None,
-                        "requires_resource_types": dialer.request_requires.resource_types if dialer.request_requires is not None else None,
+                        "proxyServer": dialer.proxy.url if dialer.proxy is not None else None,
+                        "proxyUsername": dialer.proxy.username if dialer.proxy is not None else None,
+                        "proxyPassword": dialer.proxy.password if dialer.proxy is not None else None,
+                        "requiresUrlRegex": dialer.request_requires.url_regex if dialer.request_requires is not None else None,
+                        "requiresResourceTypes": dialer.request_requires.resource_types if dialer.request_requires is not None else None,
                     }
                     for dialer in dialers
                 ],
