@@ -106,6 +106,7 @@ func (rt *CustomRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 
 	var response *http.Response = nil
 	responseValid := false
+	log.Printf("Requesting %s", req.URL.String())
 
 	for !responseValid {
 		// Iterate the dialer until we hit on the correct value
