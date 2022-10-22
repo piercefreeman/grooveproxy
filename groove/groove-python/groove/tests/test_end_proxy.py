@@ -3,10 +3,9 @@ from base64 import b64encode
 import pytest
 from bs4 import BeautifulSoup
 
+from groove.dialer import DialerDefinition, ProxyDefinition
 from groove.proxy import Groove
 from groove.tape import TapeRecord, TapeRequest, TapeResponse, TapeSession
-from groove.dialer import DialerDefinition, ProxyDefinition
-
 
 AUTH_USERNAME = "test-username"
 AUTH_PASSWORD = "test-password"
@@ -49,7 +48,7 @@ def test_end_proxy(end_proxy, middle_proxy, browser):
     with middle_proxy.launch():
         with end_proxy.launch():
             # Route everything to the proxy
-            middle_proxy.dialers_load(
+            middle_proxy.dialer_load(
                 [
                     DialerDefinition(
                         priority=1,

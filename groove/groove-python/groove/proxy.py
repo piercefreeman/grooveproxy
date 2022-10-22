@@ -1,6 +1,5 @@
 from contextlib import contextmanager
 from enum import Enum
-
 from subprocess import Popen
 from sysconfig import get_config_var
 from time import sleep
@@ -9,9 +8,9 @@ from urllib.parse import urljoin
 from requests import Session
 
 from groove.assets import get_asset_path
+from groove.dialer import DefaultInternetDialer, DialerDefinition
 from groove.enums import CacheModeEnum
 from groove.tape import TapeSession
-from groove.dialer import DialerDefinition, DefaultInternetDialer
 
 
 class ProxyFailureError(Exception):

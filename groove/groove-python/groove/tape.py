@@ -1,8 +1,11 @@
-from pydantic import validator
+from base64 import b64decode, b64encode
 from gzip import compress, decompress
 from json import dumps, loads
-from base64 import b64decode, b64encode
+
+from pydantic import validator
+
 from groove.models import GrooveModelBase
+
 
 class TapeRequest(GrooveModelBase):
     url: str

@@ -1,6 +1,7 @@
 from humps import camelize
 from pydantic import BaseModel
 
+
 class GrooveModelBase(BaseModel):
     class Config:
         alias_generator = camelize

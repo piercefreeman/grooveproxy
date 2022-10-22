@@ -20,7 +20,9 @@ type RequestRequiresDefinition struct {
 	resourceTypes []string
 }
 
-const ProxyResourceType = "Proxy-Resource-Type"
+// Don't prefix with `Prefix` - chromium appears to have specific manipulation
+// routines when a header is prefixed with `Proxy-`
+const ProxyResourceType = "Resource-Type"
 
 func NewRequestRequiresDefinition(urlRegex string, resourceTypes []string) (*RequestRequiresDefinition, error) {
 	expression, err := regexp.Compile(urlRegex)
