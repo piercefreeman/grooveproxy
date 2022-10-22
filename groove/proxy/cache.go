@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/peterbourgon/diskv/v3"
 	goproxy "github.com/piercefreeman/goproxy"
 	"github.com/pquerna/cachecontrol"
 )
@@ -44,6 +45,7 @@ type Cache struct {
 
 	cacheValues      map[string]*CacheEntry
 	cacheValuesMutex *sync.RWMutex
+	cacheDiskCache   *diskv.Diskv
 
 	inflightRequests map[string]*sync.Mutex
 	lockGeneration   *sync.Mutex
@@ -54,10 +56,18 @@ type Cache struct {
 }
 
 func NewCache() *Cache {
+	flatTransform := func(s string) []string { return []string{} }
+	diskCache := diskv.New(diskv.Options{
+		BasePath:     "my-data-dir",
+		Transform:    flatTransform,
+		CacheSizeMax: 1024 * 1024,
+	})
+
 	return &Cache{
 		mode:               CacheModeStandard,
 		cacheValues:        map[string]*CacheEntry{},
 		cacheValuesMutex:   &sync.RWMutex{},
+		cacheDiskCache:     diskCache,
 		inflightRequests:   map[string]*sync.Mutex{},
 		lockGeneration:     &sync.Mutex{},
 		blockingLocks:      make(map[string]int),
@@ -81,9 +91,9 @@ func (c *Cache) SetValidCacheContents(request *http.Request, response *http.Resp
 	// to find a source for this in the W3 spec: https://www.rfc-editor.org/rfc/rfc9110.html#name-caches
 	// For now we only implement Cache-Control
 	// TODO: Explicit handling for redirects?
-	reasons, expires, _ := cachecontrol.CachableResponse(request, response, cachecontrol.Options{})
+	noCacheReasons, expires, _ := cachecontrol.CachableResponse(request, response, cachecontrol.Options{})
 
-	if c.mode == CacheModeAggressive || len(reasons) == 0 {
+	if c.mode == CacheModeAggressive || len(noCacheReasons) == 0 {
 		c.cacheValuesMutex.Lock()
 		c.cacheValues[request.URL.String()] = &CacheEntry{
 			cacheInvalidation: expires,
