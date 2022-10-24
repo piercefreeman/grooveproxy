@@ -95,6 +95,16 @@ class Groove:
         response = self.session.post(urljoin(self.base_url_control, "/api/tape/stop"), timeout=self.timeout)
         assert response.json()["success"] == True
 
+    def tape_clear(self, tape_id: str | None = None):
+        response = self.session.post(
+            urljoin(self.base_url_control, "/api/tape/clear"),
+            json=dict(
+                tapeID=tape_id,
+            ),
+            timeout=self.timeout,
+        )
+        assert response.json()["success"] == True
+
     def set_cache_mode(self, mode: CacheModeEnum):
         response = self.session.post(
             urljoin(self.base_url_control, "/api/cache/mode"),

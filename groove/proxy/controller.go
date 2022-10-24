@@ -93,6 +93,25 @@ func createController(recorder *Recorder, cache *Cache, dialerSession *DialerSes
 		})
 	})
 
+	router.POST("/api/tape/clear", func(c *gin.Context) {
+		var request TapeRequest
+		err := json.NewDecoder(c.Request.Body).Decode(&request)
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"error":   err,
+			})
+			return
+		}
+
+		if request.TapeID == "" {
+			recorder.Clear()
+		} else {
+			recorder.ClearTapeID(request.TapeID)
+		}
+	})
+
 	router.POST("/api/cache/mode", func(c *gin.Context) {
 		var request CacheModeRequest
 		err := json.NewDecoder(c.Request.Body).Decode(&request)

@@ -38,14 +38,14 @@ type Recorder struct {
 	records []*RecordedRecord
 
 	// Record indexes that are already consumed
-	consumedRecords []int
+	consumedRecords []*RecordedRecord
 }
 
 func NewRecorder() *Recorder {
 	return &Recorder{
 		mode:            RecorderModeOff,
 		records:         make([]*RecordedRecord, 0),
-		consumedRecords: make([]int, 0),
+		consumedRecords: make([]*RecordedRecord, 0),
 	}
 }
 
@@ -124,12 +124,24 @@ func (r *Recorder) Clear() {
 	r.consumedRecords = nil
 }
 
+func (r *Recorder) ClearTapeID(tapeID string) {
+	/*
+	 * Remove all records with the given tape ID
+	 */
+	r.records = filterSlice(r.records, func(record *RecordedRecord) bool {
+		return record.TapeID != tapeID
+	})
+	r.consumedRecords = filterSlice(r.consumedRecords, func(record *RecordedRecord) bool {
+		return record.TapeID != tapeID
+	})
+}
+
 func (r *Recorder) FindMatchingResponse(request *http.Request, requestHeaders *HeaderDefinition) *http.Response {
 	/*
 	 * Given a new request, determine if we have a match in the tape to handle it
 	 */
 	log.Printf("Record size: %d\n", len(r.records))
-	for recordIndex, record := range r.records {
+	for _, record := range r.records {
 		// If we are looking for a tape, limit ourselves to just that tape
 		// Otherwise we are free to use any matching item if it's not linked to a tape
 		if record.TapeID != requestHeaders.tapeID {
@@ -138,13 +150,13 @@ func (r *Recorder) FindMatchingResponse(request *http.Request, requestHeaders *H
 
 		if record.Request.Url == request.URL.String() {
 			// Only allow each request to be played back one time
-			if contains(r.consumedRecords, recordIndex) {
+			if contains(r.consumedRecords, record) {
 				log.Printf("Already seen record, continuing: %s\n", request.URL.String())
 				continue
 			}
 
 			// Don't allow this same record to be played back again
-			r.consumedRecords = append(r.consumedRecords, recordIndex)
+			r.consumedRecords = append(r.consumedRecords, record)
 
 			// Format the archived response as a full http response
 			resp := archivedResponseToResponse(request, &record.Response)

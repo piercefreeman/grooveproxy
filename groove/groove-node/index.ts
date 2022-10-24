@@ -196,6 +196,21 @@ export class Groove {
         await checkStatus(response, "Failed to stop recording.");
     }
 
+    async tapeClear(tapeID?: string) {
+        tapeID = tapeID || "";
+        const response = await fetchWithTimeout(
+            `${this.baseUrlControl}/api/tape/clear`,
+            {
+                method: "POST",
+                timeout: this.commandTimeout,
+                body: JSON.stringify({
+                    tapeID,
+                }),
+            }
+        )
+        await checkStatus(response, "Failed to clear tape.");
+    }
+
     async setCacheMode(mode: number) {
         const response = await fetchWithTimeout(
             `${this.baseUrlControl}/api/cache/mode`,
