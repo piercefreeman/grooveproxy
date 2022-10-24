@@ -3,6 +3,7 @@ package cache
 import (
 	"io/ioutil"
 	"log"
+	"path/filepath"
 	"testing"
 )
 
@@ -110,5 +111,34 @@ func TestLimitedCacheSize(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Key should have saved: %s", err)
 		}
+	}
+}
+
+func TestDiskWrite(t *testing.T) {
+	invalidator := &CacheInvalidator{}
+
+	cacheDirectory, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatalf("Error creating temp dir: %s", err)
+	}
+
+	diskCache := invalidator.buildDiskCache(1, cacheDirectory)
+
+	testKey1 := "testKey-1"
+	testObject1 := []byte{97}
+
+	diskCache.Set(testKey1, &testObject1)
+
+	expectedLocation := blockTransform(testKey1)
+
+	// Check the disk location for the file contents
+	pathArgs := []string{cacheDirectory}
+	pathArgs = append(pathArgs, expectedLocation...)
+	pathArgs = append(pathArgs, testKey1)
+
+	// Check the file exists
+	_, err = ioutil.ReadFile(filepath.Join(pathArgs...))
+	if err != nil {
+		t.Fatalf("Error reading file: %s", err)
 	}
 }

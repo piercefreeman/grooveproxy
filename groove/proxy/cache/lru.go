@@ -32,7 +32,7 @@ type LRUCache struct {
 	/*
 	 * User-override functions - each should be implemented for a full LRU implementation
 	 */
-	SetValueCallback func(cache *LRUCache, key string, value *[]byte)
+	SetValueCallback func(cache *LRUCache, key string, value *[]byte) error
 	GetValueCallback func(cache *LRUCache, key string) (*[]byte, error)
 	HasValueCallback func(cache *LRUCache, key string) bool
 	// Explicit deletion or because of forced cache size validation
@@ -90,7 +90,10 @@ func (cache *LRUCache) Set(key string, value *[]byte) error {
 	// It's possible we would still exhaust the memory space, in which case we shouldn't
 	// store it at all. Ensure we stay under the threshold.
 	if cache.currentSize+metadata.Size <= cache.maxSize {
-		cache.SetValueCallback(cache, key, value)
+		err := cache.SetValueCallback(cache, key, value)
+		if err != nil {
+			return err
+		}
 		cache.currentSize += metadata.Size
 		cache.keyToElement[key] = cache.orderedCacheKeys.PushFront(metadata)
 	}

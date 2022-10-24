@@ -103,13 +103,14 @@ func (c *Cache) SetValidCacheContents(request *http.Request, response *http.Resp
 	noCacheReasons, expires, _ := cachecontrol.CachableResponse(request, response, cachecontrol.Options{})
 
 	if c.isModeAggressive(request) || len(noCacheReasons) == 0 {
+		log.Printf("Caching response for %s", request.URL.String())
 		cacheEntry := &CacheEntry{
 			CacheInvalidation: expires,
 			Value:             responseToArchivedResponse(response),
 		}
 		err := c.cacheDiskCache.Set(getCacheKey(request), cacheEntry)
 		if err != nil {
-			log.Printf("Failed to set cache entry for key: %s", request.URL.String())
+			log.Printf("Failed to set cache entry for key: %s %s", request.URL.String(), err.Error())
 		}
 	}
 }
