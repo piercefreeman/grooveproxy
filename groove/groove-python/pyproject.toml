@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "groove"
-version = "1.0.2"
+version = "1.0.3"
 description = ""
 authors = ["Pierce Freeman <pierce@freeman.vc>"]
 readme = "README.md"
