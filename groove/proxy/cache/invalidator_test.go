@@ -35,4 +35,12 @@ func TestSaveReadIndex(t *testing.T) {
 	if fileContents[0].Size == 0 {
 		t.Fatalf("Index should have non-zero size (actual: %d)", fileContents[0].Size)
 	}
+
+	// Determine if depenent modules can also load this file
+	invalidator.memoryCache = invalidator.buildMemoryCache(1)
+	invalidator.diskCache = invalidator.buildDiskCache(1, cacheDirectory)
+
+	// Then dump to disk one more time to make sure we can save the loaded representation
+	invalidator.writeIndex()
+	invalidator.saveWaiter.Wait()
 }
