@@ -22,9 +22,7 @@ npx @piercefreeman/groove install-ca
 ```
 
 ```javascript
-import { Grove } from '@piercefreeman/groove'
-import { TapeSession } from '@piercefreeman/groove/tape'
-import { fetchWithProxy } from '@piercefreeman/groove/utilities'
+import { Grove, TapeSession, fetchWithProxy } from '@piercefreeman/groove'
 
 const main = async () => {
     const proxy = new Groove(
