@@ -137,7 +137,8 @@ func (cache *CacheInvalidator) buildDiskCache(maxDiskSize int64, diskCacheLocati
 	// Load in the saved metadatas - the index file stores these as we intend; most recently
 	// accessed should be first
 	for _, metadata := range diskMetadata {
-		diskCache.orderedCacheKeys.PushBack(metadata.Key)
+		element := diskCache.orderedCacheKeys.PushBack(metadata)
+		diskCache.keyToElement[metadata.Key] = element
 	}
 
 	return diskCache

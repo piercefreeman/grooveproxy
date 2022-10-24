@@ -34,6 +34,10 @@ type DialerDefinitionRequests struct {
 
 func createController(recorder *Recorder, cache *Cache, dialerSession *DialerSession) *gin.Engine {
 	router := gin.Default()
+	router.GET("/", func(c *gin.Context) {
+		c.String(http.StatusOK, "Groove is running on port.")
+	})
+
 	router.POST("/api/tape/record", func(c *gin.Context) {
 		// Start to record the requests, nullifying any ones from an old session
 		recorder.mode = RecorderModeWrite
