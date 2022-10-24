@@ -20,10 +20,6 @@ type RequestRequiresDefinition struct {
 	resourceTypes []string
 }
 
-// Don't prefix with `Prefix` - chromium appears to have specific manipulation
-// routines when a header is prefixed with `Proxy-`
-const ProxyResourceType = "Resource-Type"
-
 func NewRequestRequiresDefinition(urlRegex string, resourceTypes []string) (*RequestRequiresDefinition, error) {
 	expression, err := regexp.Compile(urlRegex)
 
@@ -223,7 +219,7 @@ func (session *DialerSession) candidateDialers(context *DialerContext) []*Dialer
 	candidateDialers = filterSlice(
 		candidateDialers,
 		func(dialer *DialerDefinition) bool {
-			return !containsString(context.attemptedDialIdentifiers, dialer.identifier)
+			return !contains(context.attemptedDialIdentifiers, dialer.identifier)
 		},
 	)
 

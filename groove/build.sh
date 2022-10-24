@@ -1,17 +1,21 @@
 #! /bin/bash -e
 
+# On OSX can be installed by `brew install coreutils`
+scriptPath=$(realpath $0)
+rootDirectory="$(dirname "$scriptPath")"
+
 echo "Rebuilding groove proxy..."
 
 # Clear out build files so we can more easily see build failures
-rm -rf build
-rm -rf ./groove-python/groove/assets/grooveproxy
+rm -rf $rootDirectory/build
+rm -rf $rootDirectory/groove-python/groove/assets/grooveproxy
 
 # Build
-mkdir -p build
-(cd proxy && go build -o ../build)
+mkdir -p $rootDirectory/build
+(cd $rootDirectory/proxy && go build -o $rootDirectory/build)
 
 # Manual Python install
-cp ./build/grooveproxy ./groove-python/groove/assets/grooveproxy
+cp $rootDirectory/build/grooveproxy $rootDirectory/groove-python/groove/assets/grooveproxy
 
 # Manual Node install
-cp ./build/grooveproxy ./groove-node/node_modules/.bin/grooveproxy
+cp $rootDirectory/build/grooveproxy $rootDirectory/groove-node/node_modules/.bin/grooveproxy

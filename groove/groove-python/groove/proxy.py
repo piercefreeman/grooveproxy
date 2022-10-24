@@ -73,8 +73,14 @@ class Groove:
         response = self.session.post(urljoin(self.base_url_control, "/api/tape/record"), timeout=self.timeout)
         assert response.json()["success"] == True
 
-    def tape_get(self) -> TapeSession:
-        tape_response = self.session.post(urljoin(self.base_url_control, "/api/tape/retrieve"), timeout=self.timeout)
+    def tape_get(self, tape_id: str | None = None) -> TapeSession:
+        tape_response = self.session.post(
+            urljoin(self.base_url_control, "/api/tape/retrieve"),
+            json=dict(
+                tapeID=tape_id,
+            ),
+            timeout=self.timeout
+        )
         return TapeSession.from_server(tape_response.content)
 
     def tape_load(self, session: TapeSession):
@@ -87,6 +93,16 @@ class Groove:
 
     def tape_stop(self):
         response = self.session.post(urljoin(self.base_url_control, "/api/tape/stop"), timeout=self.timeout)
+        assert response.json()["success"] == True
+
+    def tape_clear(self, tape_id: str | None = None):
+        response = self.session.post(
+            urljoin(self.base_url_control, "/api/tape/clear"),
+            json=dict(
+                tapeID=tape_id,
+            ),
+            timeout=self.timeout,
+        )
         assert response.json()["success"] == True
 
     def set_cache_mode(self, mode: CacheModeEnum):

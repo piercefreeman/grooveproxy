@@ -21,26 +21,35 @@ const (
 type RecordedRecord struct {
 	Request  ArchivedRequest  `json:"request"`
 	Response ArchivedResponse `json:"response"`
+
+	// Optional tape ID to tag this request with a certain tape
+	TapeID string `json:"tape_id"`
+
 	//inflightMilliseconds int
 }
 
 type Recorder struct {
+	/*
+	 * Tape recorder and replayer
+	 *
+	 * A recorder supports multiple concurrent tape writes but only playback from one tape at a time.
+	 */
 	mode    int // RecorderModeRead | RecorderModeWrite
 	records []*RecordedRecord
 
-	// Indexes of requests that are already consumed
-	consumedRecords []int
+	// Record indexes that are already consumed
+	consumedRecords []*RecordedRecord
 }
 
 func NewRecorder() *Recorder {
 	return &Recorder{
 		mode:            RecorderModeOff,
 		records:         make([]*RecordedRecord, 0),
-		consumedRecords: make([]int, 0),
+		consumedRecords: make([]*RecordedRecord, 0),
 	}
 }
 
-func (r *Recorder) LogPair(request *http.Request, response *http.Response) {
+func (r *Recorder) LogPair(request *http.Request, requestHeaders *HeaderDefinition, response *http.Response) {
 	archivedRequest := requestToArchivedRequest(request)
 	archivedResponse := responseToArchivedResponse(response)
 
@@ -50,17 +59,32 @@ func (r *Recorder) LogPair(request *http.Request, response *http.Response) {
 			&RecordedRecord{
 				Request:  *archivedRequest,
 				Response: *archivedResponse,
+				TapeID:   requestHeaders.tapeID,
 			},
 		)
 	}
 }
 
-func (r *Recorder) ExportData() (response *bytes.Buffer, err error) {
+func (r *Recorder) ExportData(tapeID string) (response *bytes.Buffer, err error) {
 	/*
 	 * Formats data in a readable payload, gzipped for space savings
+	 * If tapeID is blank, will export all recorded items
+	 * If tapeID is provided, will export items with that tape ID and those with no tape flagged. We include
+	 * items with no tape flagged because some requests cannot be tagged with a tape via request interception
+	 * because of browser control limitations.
 	 */
-	log.Printf("Total requests: %d", len(r.records))
-	json, err := json.Marshal(r.records)
+	var recordsToExport []*RecordedRecord
+
+	if len(tapeID) == 0 {
+		recordsToExport = r.records
+	} else {
+		recordsToExport = filterSlice(r.records, func(record *RecordedRecord) bool {
+			return record.TapeID == tapeID || record.TapeID == ""
+		})
+	}
+
+	log.Printf("Total requests: %d", len(recordsToExport))
+	json, err := json.Marshal(recordsToExport)
 
 	if err != nil {
 		log.Println("Unable to export json payload")
@@ -100,21 +124,39 @@ func (r *Recorder) Clear() {
 	r.consumedRecords = nil
 }
 
-func (r *Recorder) FindMatchingResponse(request *http.Request) *http.Response {
+func (r *Recorder) ClearTapeID(tapeID string) {
+	/*
+	 * Remove all records with the given tape ID
+	 */
+	r.records = filterSlice(r.records, func(record *RecordedRecord) bool {
+		return record.TapeID != tapeID
+	})
+	r.consumedRecords = filterSlice(r.consumedRecords, func(record *RecordedRecord) bool {
+		return record.TapeID != tapeID
+	})
+}
+
+func (r *Recorder) FindMatchingResponse(request *http.Request, requestHeaders *HeaderDefinition) *http.Response {
 	/*
 	 * Given a new request, determine if we have a match in the tape to handle it
 	 */
 	log.Printf("Record size: %d\n", len(r.records))
-	for recordIndex, record := range r.records {
+	for _, record := range r.records {
+		// If we are looking for a tape, limit ourselves to just that tape
+		// Otherwise we are free to use any matching item if it's not linked to a tape
+		if record.TapeID != requestHeaders.tapeID {
+			continue
+		}
+
 		if record.Request.Url == request.URL.String() {
 			// Only allow each request to be played back one time
-			if containsInt(r.consumedRecords, recordIndex) {
+			if contains(r.consumedRecords, record) {
 				log.Printf("Already seen record, continuing: %s\n", request.URL.String())
 				continue
 			}
 
 			// Don't allow this same record to be played back again
-			r.consumedRecords = append(r.consumedRecords, recordIndex)
+			r.consumedRecords = append(r.consumedRecords, record)
 
 			// Format the archived response as a full http response
 			resp := archivedResponseToResponse(request, &record.Response)
@@ -145,7 +187,7 @@ func setupRecorderMiddleware(proxy *goproxy.ProxyHttpServer, recorder *Recorder)
 				return r, nil
 			}
 
-			recordResult := recorder.FindMatchingResponse(r)
+			recordResult := recorder.FindMatchingResponse(r, ctx.UserData.(*HeaderDefinition))
 
 			if recordResult != nil {
 				log.Printf("Record found: %s\n", r.URL.String())
@@ -185,7 +227,7 @@ func setupRecorderMiddleware(proxy *goproxy.ProxyHttpServer, recorder *Recorder)
 				request := requestHistory[i]
 				response := responseHistory[i]
 
-				recorder.LogPair(request, response)
+				recorder.LogPair(request, ctx.UserData.(*HeaderDefinition), response)
 				log.Println("Added record log.")
 			}
 

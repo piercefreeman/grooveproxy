@@ -5,15 +5,10 @@ from groove.proxy import ProxyFailureError
 
 
 @pytest.mark.xfail(reason="TLS certificate blocked", raises=ProxyFailureError)
-def test_tls_addons(proxy, browser):
+def test_tls_addons(proxy, context):
     """
     Test TLS addons
     """
-    context = browser.new_context(
-        proxy={
-            "server": proxy.base_url_proxy,
-        }
-    )
     page = context.new_page()
 
     try:
