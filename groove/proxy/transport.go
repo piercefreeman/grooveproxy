@@ -98,14 +98,15 @@ func (rt *CustomRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 	 * Implement our custom roundtrip logic
 	 * This is the only function that's actually required by the http.RoundTripper interface
 	 */
-	// Remove additional headers that `removeProxyHeaders` doesn't cover
-	req.Header.Del(ProxyResourceType)
-
 	// New request, fresh context to track requests
 	dialerContext := rt.dialerSession.NewDialerContext(req)
 
+	// Remove additional headers that `removeProxyHeaders` doesn't cover
+	req.Header.Del(ProxyResourceType)
+
 	var response *http.Response = nil
 	responseValid := false
+	log.Printf("Requesting %s", req.URL.String())
 
 	for !responseValid {
 		// Iterate the dialer until we hit on the correct value

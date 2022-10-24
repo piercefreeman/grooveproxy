@@ -1,8 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
+	"os/user"
+	"path"
 	"sync"
 	"time"
 
@@ -34,16 +37,17 @@ const (
 )
 
 type CacheEntry struct {
-	cacheInvalidation time.Time
-	// TODO: make pointer to underlying value
-	value *ArchivedResponse
+	CacheInvalidation time.Time
+	Value             *ArchivedResponse
+	Error             string
 }
 
 type Cache struct {
 	mode int // CacheModeOff | CacheModeStandard | CacheModeAggressive
 
-	cacheValues      map[string]*CacheEntry
-	cacheValuesMutex *sync.RWMutex
+	// Disk cache comes bundled with a RWMutex so we can call functions directly
+	// and the lock will be handled internally
+	cacheDiskCache *CacheInvalidator
 
 	inflightRequests map[string]*sync.Mutex
 	lockGeneration   *sync.Mutex
@@ -53,11 +57,20 @@ type Cache struct {
 	blockingLocksMutex *sync.RWMutex
 }
 
-func NewCache() *Cache {
+func NewCache(cacheSizeMaxMB uint64) *Cache {
+	user, err := user.Current()
+	if err != nil {
+		log.Fatal(fmt.Errorf("Unable to resolve current user: %w", err))
+		return nil
+	}
+
+	// We treat the disk cache as a raw key/value store and manipulate it accordingly
+	// We therefore append a fresh cache directory to their path to ensure no file condicts
+	cachePath := path.Join(user.HomeDir, ".grooveproxy/cache")
+
 	return &Cache{
 		mode:               CacheModeStandard,
-		cacheValues:        map[string]*CacheEntry{},
-		cacheValuesMutex:   &sync.RWMutex{},
+		cacheDiskCache:     NewCacheInvalidator(cachePath, 20, 500, 10),
 		inflightRequests:   map[string]*sync.Mutex{},
 		lockGeneration:     &sync.Mutex{},
 		blockingLocks:      make(map[string]int),
@@ -81,38 +94,71 @@ func (c *Cache) SetValidCacheContents(request *http.Request, response *http.Resp
 	// to find a source for this in the W3 spec: https://www.rfc-editor.org/rfc/rfc9110.html#name-caches
 	// For now we only implement Cache-Control
 	// TODO: Explicit handling for redirects?
-	reasons, expires, _ := cachecontrol.CachableResponse(request, response, cachecontrol.Options{})
+	noCacheReasons, expires, _ := cachecontrol.CachableResponse(request, response, cachecontrol.Options{})
 
-	if c.mode == CacheModeAggressive || len(reasons) == 0 {
-		c.cacheValuesMutex.Lock()
-		c.cacheValues[request.URL.String()] = &CacheEntry{
-			cacheInvalidation: expires,
-			value:             responseToArchivedResponse(response),
+	if c.mode == CacheModeAggressive || len(noCacheReasons) == 0 {
+		cacheEntry := &CacheEntry{
+			CacheInvalidation: expires,
+			Value:             responseToArchivedResponse(response),
 		}
-		c.cacheValuesMutex.Unlock()
+		err := c.cacheDiskCache.Set(getCacheKey(request), cacheEntry)
+		if err != nil {
+			log.Printf("Failed to set cache entry for key: %s", request.URL.String())
+		}
 	}
 }
 
-func (c *Cache) GetCacheContents(url string) *ArchivedResponse {
+func (c *Cache) SetFailedCacheContents(request *http.Request, err error) {
+	/*
+	 * Indicate that the given request failed (no response was received at all), can be used to avoid
+	 * querying that same resource in the future.
+	 * Only applies for aggressive modes
+	 */
+	if c.mode != CacheModeAggressive {
+		return
+	}
+
+	// Set default expiration in 24 hours
+	expires := time.Now().Add(24 * time.Hour)
+
+	cacheEntry := &CacheEntry{
+		CacheInvalidation: expires,
+		Value:             nil,
+		Error:             err.Error(),
+	}
+	err = c.cacheDiskCache.Set(getCacheKey(request), cacheEntry)
+	if err != nil {
+		log.Printf("Failed to set cache entry for key: %s", request.URL.String())
+	}
+}
+
+func (c *Cache) GetCacheContents(request *http.Request) *CacheEntry {
 	// No-op if we are disabled, since we don't use request based locks
 	if c.mode == CacheModeOff {
 		return nil
 	}
 
-	// Only one cache entry appears in the cache at any one time
-	// Determine if this can instantly be retrieved without having to acquire the lock
-	// (allows for slightly faster access in a non-race condition risk way)
-	c.cacheValuesMutex.RLock()
-	cache, ok := c.cacheValues[url]
-	c.cacheValuesMutex.RUnlock()
+	requestKey := getCacheKey(request)
 
-	if ok {
-		// Determine if the cache is still valid
-		if c.cacheEntryValid(cache) {
-			return cache.value
-		}
+	if !c.cacheDiskCache.Has(requestKey) {
+		return nil
 	}
 
+	var cache CacheEntry
+	err := c.cacheDiskCache.Get(requestKey, &cache)
+
+	if err != nil {
+		log.Printf("Failed to read cache entry for key: %s (%s)", request.URL.String(), requestKey)
+		return nil
+	}
+
+	// Determine if the cache is still valid
+	if c.cacheEntryValid(&cache) {
+		log.Printf("Return cache value: %s (%s)", request.URL.String(), requestKey)
+		return &cache
+	}
+
+	log.Printf("Cache miss: %s (%s)", request.URL.String(), requestKey)
 	return nil
 }
 
@@ -194,11 +240,8 @@ func (c *Cache) ReleaseRequestLock(url string) {
 }
 
 func (c *Cache) Clear() {
-	c.cacheValuesMutex.Lock()
-	for key, _ := range c.cacheValues {
-		delete(c.cacheValues, key)
-	}
-	c.cacheValuesMutex.Unlock()
+	// Will erase everything from the given disk
+	c.cacheDiskCache.Clear()
 }
 
 func (c *Cache) cacheEntryValid(cacheEntry *CacheEntry) bool {
@@ -212,7 +255,7 @@ func (c *Cache) cacheEntryValid(cacheEntry *CacheEntry) bool {
 	}
 
 	now := time.Now()
-	return now.Before(cacheEntry.cacheInvalidation)
+	return now.Before(cacheEntry.CacheInvalidation)
 }
 
 func setupCacheMiddleware(proxy *goproxy.ProxyHttpServer, cache *Cache, recorder *Recorder) {
@@ -227,9 +270,14 @@ func setupCacheMiddleware(proxy *goproxy.ProxyHttpServer, cache *Cache, recorder
 			}
 
 			// Determine if we have a cache result available
-			cacheValue := cache.GetCacheContents(r.URL.String())
+			cacheValue := cache.GetCacheContents(r)
 			if cacheValue != nil {
-				return r, archivedResponseToResponse(r, cacheValue)
+				if cacheValue.Value != nil {
+					return r, archivedResponseToResponse(r, cacheValue.Value)
+				} else {
+					// We should fail the request
+					return r, goproxy.NewResponse(r, goproxy.ContentTypeText, http.StatusBadGateway, cacheValue.Error)
+				}
 			}
 
 			// If we got here, we couldn't immediately resolve the cache
@@ -252,6 +300,7 @@ func setupCacheMiddleware(proxy *goproxy.ProxyHttpServer, cache *Cache, recorder
 		func(response *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
 			if ctx.Error != nil {
 				request := ctx.Req
+				cache.SetFailedCacheContents(request, ctx.Error)
 				cache.ReleaseRequestLock(request.URL.String())
 				return nil
 			}

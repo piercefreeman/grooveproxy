@@ -37,10 +37,13 @@ func NewRequestRequiresDefinition(urlRegex string, resourceTypes []string) (*Req
 	}, nil
 }
 
-func (definition *RequestRequiresDefinition) IsRequestValid(request *http.Request) bool {
+func (definition *RequestRequiresDefinition) IsRequestValid(context *DialerContext) bool {
 	/*
 	 * Check if the request meets the requirements of this definition
 	 */
+	request := context.Request
+	requestType := context.requestType
+
 	if definition.urlRegex != nil {
 		if definition.urlRegex.MatchString(request.URL.String()) {
 			log.Printf("Request URL matches regex %s", request.URL.String())
@@ -49,8 +52,6 @@ func (definition *RequestRequiresDefinition) IsRequestValid(request *http.Reques
 	}
 
 	if len(definition.resourceTypes) > 0 {
-		requestType := request.Header.Get(ProxyResourceType)
-
 		for _, resourceType := range definition.resourceTypes {
 			if requestType == resourceType {
 				log.Printf("Resource type matches %s", requestType)
@@ -152,6 +153,10 @@ type DialerContext struct {
 	// If blank, will assume that
 	Request *http.Request
 
+	// Retrieved request type from the http request, since this can (and will) be manipulated
+	// before we send to remote
+	requestType string
+
 	// List of DialDefinitions that we have already tried
 	attemptedDialIdentifiers []string
 
@@ -187,8 +192,11 @@ func (session *DialerSession) NewDialerContext(request *http.Request) *DialerCon
 		totalTries = len(session.DialerDefinitions)
 	}
 
+	requestType := request.Header.Get(ProxyResourceType)
+
 	return &DialerContext{
 		Request:        request,
+		requestType:    requestType,
 		remainingTries: totalTries,
 	}
 }
@@ -206,7 +214,7 @@ func (session *DialerSession) candidateDialers(context *DialerContext) []*Dialer
 		candidateDialers = filterSlice(
 			candidateDialers,
 			func(dialer *DialerDefinition) bool {
-				return dialer.requestRequires == nil || (dialer.requestRequires != nil && dialer.requestRequires.IsRequestValid(context.Request))
+				return dialer.requestRequires == nil || (dialer.requestRequires != nil && dialer.requestRequires.IsRequestValid(context))
 			},
 		)
 	}

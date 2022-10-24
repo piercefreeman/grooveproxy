@@ -16,9 +16,6 @@ import (
 )
 
 func main() {
-	recorder := NewRecorder()
-	cache := NewCache()
-
 	if len(os.Args) > 1 {
 		command := os.Args[1]
 		if command == "install-ca" {
@@ -37,6 +34,9 @@ func main() {
 		// Location to CA
 		caCertificate = flag.String("ca-certificate", "", "Path to CA Certificate")
 		caKey         = flag.String("ca-key", "", "Path to CA Key")
+
+		// Cache size (in memory)
+		cacheMemorySize = flag.Int("cache-memory-mb", 25, "cache memory size")
 
 		// Require authentication to access this proxy
 		//authUsername = flag.String("auth-username", "", "Require authentication to the current server")
@@ -58,6 +58,9 @@ func main() {
 			log.Fatal(fmt.Errorf("Error setting CA: %w", err))
 		}
 	}
+
+	recorder := NewRecorder()
+	cache := NewCache(uint64(*cacheMemorySize))
 
 	proxy := goproxy.NewProxyHttpServer()
 	proxy.Verbose = *verbose

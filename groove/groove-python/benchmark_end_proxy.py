@@ -5,6 +5,7 @@ Benchmark the load performance of a 3rd party proxy provider
 from time import time
 
 from click import command, option, secho
+from groove.enums import CacheModeEnum
 from playwright.sync_api import sync_playwright
 
 from groove.dialer import (DefaultLocalPassthroughDialer, DialerDefinition,
@@ -33,6 +34,7 @@ def benchmark(url, proxy_server, proxy_username, proxy_password):
 
     with groove.launch():
         with sync_playwright() as p:
+            groove.set_cache_mode(CacheModeEnum.OFF)
             groove.dialer_load(
                 [
                     DefaultLocalPassthroughDialer(),
