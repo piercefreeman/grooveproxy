@@ -34,6 +34,8 @@ type LRUCache struct {
 	keyToElement     map[string]*list.Element
 
 	// Bytes
+	// If `maxSize` is -1, will grow without bound
+	// If instead maxSize is 0, won't populate the LRU cache
 	currentSize int64
 	maxSize     int64
 
@@ -84,21 +86,23 @@ func (cache *LRUCache) Set(key string, value *[]byte) error {
 
 	// Check if either the memory or disk cache would become full with this object and purge accordingly
 	// Purge the oldest entries until we have enough space
-	for cache.currentSize+metadata.Size > cache.maxSize {
-		oldestElement := cache.orderedCacheKeys.Back()
-		if oldestElement == nil {
-			break
+	if cache.maxSize > -1 {
+		for cache.currentSize+metadata.Size > cache.maxSize {
+			oldestElement := cache.orderedCacheKeys.Back()
+			if oldestElement == nil {
+				break
+			}
+			oldestKey := oldestElement.Value.(CacheMetadata).Key
+			cache.Delete(oldestKey)
 		}
-		oldestKey := oldestElement.Value.(CacheMetadata).Key
-		cache.Delete(oldestKey)
 	}
 
 	// It's possible we would still exhaust the memory space, in which case we shouldn't
 	// store it at all. Ensure we stay under the threshold.
-	if cache.currentSize+metadata.Size < cache.maxSize {
+	if cache.currentSize+metadata.Size <= cache.maxSize {
 		cache.SetValueCallback(cache, key, value)
 		cache.currentSize += metadata.Size
-		cache.orderedCacheKeys.PushFront(metadata)
+		cache.keyToElement[key] = cache.orderedCacheKeys.PushFront(metadata)
 	}
 
 	return nil
@@ -147,6 +151,7 @@ type CacheInvalidator struct {
 	// disk writes
 	saveInterval     int
 	operationCounter int
+	saveWaiter       *sync.WaitGroup
 }
 
 const transformBlockSize = 2 // Grouping of chars per directory depth
@@ -173,16 +178,17 @@ func NewCacheInvalidator(
 		indexPath:       filepath.Join(diskCacheLocation, "index.json"),
 		memoryCacheLock: sync.RWMutex{},
 		saveInterval:    saveInterval,
+		saveWaiter:      &sync.WaitGroup{},
 	}
 
-	invalidator.diskCache = invalidator.buildDiskCache(maxDiskSizeMB, diskCacheLocation)
-	invalidator.memoryCache = invalidator.buildMemoryCache(maxMemorySizeMB)
+	invalidator.diskCache = invalidator.buildDiskCache(1024*1024*maxDiskSizeMB, diskCacheLocation)
+	invalidator.memoryCache = invalidator.buildMemoryCache(1024 * 1024 * maxMemorySizeMB)
 
 	return invalidator
 }
 
-func (cache *CacheInvalidator) buildMemoryCache(maxMemorySizeMB int64) *LRUCache {
-	memoryCache := NewLRUCache(make(MemoryCache), 0, 1024*1024*maxMemorySizeMB)
+func (cache *CacheInvalidator) buildMemoryCache(maxMemorySize int64) *LRUCache {
+	memoryCache := NewLRUCache(make(MemoryCache), 0, maxMemorySize)
 	memoryCache.SetValueCallback = func(lru *LRUCache, key string, value *[]byte) {
 		cache.memoryCacheLock.Lock()
 		lru.backingCache.(MemoryCache)[key] = value
@@ -213,8 +219,8 @@ func (cache *CacheInvalidator) buildMemoryCache(maxMemorySizeMB int64) *LRUCache
 	return memoryCache
 }
 
-func (cache *CacheInvalidator) buildDiskCache(maxDiskSizeMB int64, diskCacheLocation string) *LRUCache {
-	diskMetadata, totalDiskSize := cache.readIndex()
+func (cache *CacheInvalidator) buildDiskCache(maxDiskSize int64, diskCacheLocation string) *LRUCache {
+	diskMetadata, totalDiskSize, _ := cache.readIndex()
 
 	diskCache := NewLRUCache(
 		diskv.New(diskv.Options{
@@ -222,8 +228,8 @@ func (cache *CacheInvalidator) buildDiskCache(maxDiskSizeMB int64, diskCacheLoca
 			Transform:    blockTransform,
 			CacheSizeMax: 0,
 		}),
-		1024*1024*totalDiskSize,
-		1024*1024*maxDiskSizeMB,
+		totalDiskSize,
+		maxDiskSize,
 	)
 	diskCache.SetValueCallback = func(lru *LRUCache, key string, value *[]byte) {
 		lru.backingCache.(*diskv.Diskv).Write(key, *value)
@@ -301,12 +307,12 @@ func (cache *CacheInvalidator) Clear() {
 	cache.diskCache.DeleteAll()
 }
 
-func (cache *CacheInvalidator) readIndex() (orderedMetadata []*CacheMetadata, totalSize int64) {
+func (cache *CacheInvalidator) readIndex() (orderedMetadata []*CacheMetadata, totalSize int64, err error) {
 	// Read from the cached index file, if it exists
 	// If not we are starting the disk store from scratch
 	indexFile, err := os.Open(cache.indexPath)
 	if err != nil {
-		return nil, 0
+		return nil, 0, err
 	}
 
 	defer indexFile.Close()
@@ -321,7 +327,7 @@ func (cache *CacheInvalidator) readIndex() (orderedMetadata []*CacheMetadata, to
 		totalSize += metadata.Size
 	}
 
-	return metadatas, totalSize
+	return metadatas, totalSize, nil
 }
 
 func (cache *CacheInvalidator) writeIndex() {
@@ -333,7 +339,11 @@ func (cache *CacheInvalidator) writeIndex() {
 
 	cache.operationCounter = 0
 
+	cache.saveWaiter.Add(1)
+
 	go func() {
+		defer cache.saveWaiter.Done()
+
 		cache.indexWriteLock.Lock()
 		defer cache.indexWriteLock.Unlock()
 
@@ -350,10 +360,10 @@ func (cache *CacheInvalidator) writeIndex() {
 		defer indexFile.Close()
 
 		// Write the current metadata to the file
-		var metadata []*CacheMetadata = nil
+		var metadata []CacheMetadata = nil
 
 		for element := cache.diskCache.orderedCacheKeys.Front(); element != nil; element = element.Next() {
-			metadata = append(metadata, element.Value.(*CacheMetadata))
+			metadata = append(metadata, element.Value.(CacheMetadata))
 		}
 
 		metadataBytes, err := json.Marshal(metadata)
