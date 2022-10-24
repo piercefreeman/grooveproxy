@@ -1,8 +1,12 @@
-package main
+package cache
 
 import (
 	"testing"
 )
+
+type TestSimpleObject struct {
+	Value string
+}
 
 func TestEncodeDecodeObject(t *testing.T) {
 	object := &TestSimpleObject{

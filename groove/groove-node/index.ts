@@ -12,7 +12,8 @@ import { DialerDefinition, DefaultInternetDialer } from './dialer';
 export const CacheModeEnum = {
 	OFF: 0,
     STANDARD: 1,
-    AGGRESSIVE: 2
+    AGGRESSIVE_GET: 2,
+    AGGRESSIVE: 3
 }
 
 export interface GrooveConfiguration {
@@ -200,6 +201,17 @@ export class Groove {
             }
         )
         await checkStatus(response, "Failed to set cache mode.");
+    }
+
+    async cacheClear() {
+        const response = await fetchWithTimeout(
+            `${this.baseUrlControl}/api/cache/clear`,
+            {
+                method: "POST",
+                timeout: this.commandTimeout,
+            }
+        )
+        await checkStatus(response, "Failed to clear cache.");
     }
 
     async dialerLoad(dialers: DialerDefinition[]) {

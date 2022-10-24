@@ -11,6 +11,8 @@ import (
 
 	goproxy "github.com/piercefreeman/goproxy"
 	"github.com/pquerna/cachecontrol"
+
+	lrucache "grooveproxy/cache"
 )
 
 const (
@@ -28,6 +30,10 @@ const (
 	// This has the drawback of blocking until the request is completed (latency) while providing
 	// the upshot of fewer requests to the end server.
 	CacheModeStandard = iota
+
+	// Cache all GET requests. A special case of CacheModeAggressive to allow POST requests to dynamically
+	// update server content.
+	CacheModeGetAggressive = iota
 
 	// Cache everything, regardless of server driven cache status
 	// Like `CacheModeStandard`, this will block until all end requests are resolved. But since we
@@ -47,7 +53,7 @@ type Cache struct {
 
 	// Disk cache comes bundled with a RWMutex so we can call functions directly
 	// and the lock will be handled internally
-	cacheDiskCache *CacheInvalidator
+	cacheDiskCache *lrucache.CacheInvalidator
 
 	inflightRequests map[string]*sync.Mutex
 	lockGeneration   *sync.Mutex
@@ -70,7 +76,7 @@ func NewCache(cacheSizeMaxMB uint64) *Cache {
 
 	return &Cache{
 		mode:               CacheModeStandard,
-		cacheDiskCache:     NewCacheInvalidator(cachePath, 20, 500, 10),
+		cacheDiskCache:     lrucache.NewCacheInvalidator(cachePath, 20, 500, 10),
 		inflightRequests:   map[string]*sync.Mutex{},
 		lockGeneration:     &sync.Mutex{},
 		blockingLocks:      make(map[string]int),
@@ -96,7 +102,7 @@ func (c *Cache) SetValidCacheContents(request *http.Request, response *http.Resp
 	// TODO: Explicit handling for redirects?
 	noCacheReasons, expires, _ := cachecontrol.CachableResponse(request, response, cachecontrol.Options{})
 
-	if c.mode == CacheModeAggressive || len(noCacheReasons) == 0 {
+	if c.isModeAggressive(request) || len(noCacheReasons) == 0 {
 		cacheEntry := &CacheEntry{
 			CacheInvalidation: expires,
 			Value:             responseToArchivedResponse(response),
@@ -114,7 +120,7 @@ func (c *Cache) SetFailedCacheContents(request *http.Request, err error) {
 	 * querying that same resource in the future.
 	 * Only applies for aggressive modes
 	 */
-	if c.mode != CacheModeAggressive {
+	if !c.isModeAggressive(request) {
 		return
 	}
 
@@ -153,7 +159,7 @@ func (c *Cache) GetCacheContents(request *http.Request) *CacheEntry {
 	}
 
 	// Determine if the cache is still valid
-	if c.cacheEntryValid(&cache) {
+	if c.cacheEntryValid(request, &cache) {
 		log.Printf("Return cache value: %s (%s)", request.URL.String(), requestKey)
 		return &cache
 	}
@@ -244,18 +250,39 @@ func (c *Cache) Clear() {
 	c.cacheDiskCache.Clear()
 }
 
-func (c *Cache) cacheEntryValid(cacheEntry *CacheEntry) bool {
+func (c *Cache) cacheEntryValid(request *http.Request, cacheEntry *CacheEntry) bool {
 	/*
 	 * Given a cache entry determine if the specified date is still valid
 	 */
 	// If a cache value exists and we are performing aggressive caching, we don't care
 	// about expiration time
-	if c.mode == CacheModeAggressive {
+	if c.isModeAggressive(request) {
 		return true
 	}
 
 	now := time.Now()
 	return now.Before(cacheEntry.CacheInvalidation)
+}
+
+func (c *Cache) isModeAggressive(request *http.Request) bool {
+	/*
+	 * Aggressive modes are a special form of caching, where we will cache everything assuming the request
+	 * meets some properties.
+	 * - CacheModeAggressive: Cache everything
+	 * - CacheModeGetAggressive: Cache all GET requests
+	 *
+	 * This function will return true if the given request should quality for aggressive handling AND if the
+	 * current mode allows for aggressive caching.
+	 */
+	if c.mode == CacheModeAggressive {
+		return true
+	}
+
+	if c.mode == CacheModeGetAggressive && request.Method == "GET" {
+		return true
+	}
+
+	return false
 }
 
 func setupCacheMiddleware(proxy *goproxy.ProxyHttpServer, cache *Cache, recorder *Recorder) {

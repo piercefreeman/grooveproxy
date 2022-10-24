@@ -9,6 +9,8 @@ from groove.proxy import Groove
 def proxy():
     proxy = Groove()
     with proxy.launch():
+        # Before we yield to new client calls clear out any remaining cache items
+        proxy.cache_clear()
         yield proxy
 
 @pytest.fixture(scope="function")
