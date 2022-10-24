@@ -98,7 +98,7 @@ func createController(recorder *Recorder, cache *Cache, dialerSession *DialerSes
 		})
 	})
 
-	router.POST("/api/cache/delete", func(c *gin.Context) {
+	router.POST("/api/cache/clear", func(c *gin.Context) {
 		cache.Clear()
 
 		c.JSON(http.StatusOK, gin.H{

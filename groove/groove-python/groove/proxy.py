@@ -98,6 +98,10 @@ class Groove:
         )
         assert response.json()["success"] == True
 
+    def cache_clear(self):
+        response = self.session.post(urljoin(self.base_url_control, "/api/cache/clear"), timeout=self.timeout)
+        assert response.json()["success"] == True
+
     def dialer_load(self, dialers: list[DialerDefinition]):
         response = self.session.post(
             urljoin(self.base_url_control, "/api/dialer/load"),

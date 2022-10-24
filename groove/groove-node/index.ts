@@ -203,6 +203,17 @@ export class Groove {
         await checkStatus(response, "Failed to set cache mode.");
     }
 
+    async cacheClear() {
+        const response = await fetchWithTimeout(
+            `${this.baseUrlControl}/api/cache/clear`,
+            {
+                method: "POST",
+                timeout: this.commandTimeout,
+            }
+        )
+        await checkStatus(response, "Failed to clear cache.");
+    }
+
     async dialerLoad(dialers: DialerDefinition[]) {
         const response = await fetchWithTimeout(
             `${this.baseUrlControl}/api/dialer/load`,
