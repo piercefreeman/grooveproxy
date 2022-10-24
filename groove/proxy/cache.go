@@ -11,6 +11,8 @@ import (
 
 	goproxy "github.com/piercefreeman/goproxy"
 	"github.com/pquerna/cachecontrol"
+
+	lrucache "grooveproxy/cache"
 )
 
 const (
@@ -47,7 +49,7 @@ type Cache struct {
 
 	// Disk cache comes bundled with a RWMutex so we can call functions directly
 	// and the lock will be handled internally
-	cacheDiskCache *CacheInvalidator
+	cacheDiskCache *lrucache.CacheInvalidator
 
 	inflightRequests map[string]*sync.Mutex
 	lockGeneration   *sync.Mutex
@@ -70,7 +72,7 @@ func NewCache(cacheSizeMaxMB uint64) *Cache {
 
 	return &Cache{
 		mode:               CacheModeStandard,
-		cacheDiskCache:     NewCacheInvalidator(cachePath, 20, 500, 10),
+		cacheDiskCache:     lrucache.NewCacheInvalidator(cachePath, 20, 500, 10),
 		inflightRequests:   map[string]*sync.Mutex{},
 		lockGeneration:     &sync.Mutex{},
 		blockingLocks:      make(map[string]int),
