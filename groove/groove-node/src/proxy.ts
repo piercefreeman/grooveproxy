@@ -7,7 +7,7 @@ import { fetchWithTimeout, sleep, streamToBuffer } from './utilities';
 import { TapeSession } from './tape';
 import { homedir } from 'os';
 import FormData from 'form-data';
-import { DialerDefinition, DefaultInternetDialer } from './dialer';
+import { DialerDefinition } from './dialer';
 
 export const CacheModeEnum = {
 	OFF: 0,
