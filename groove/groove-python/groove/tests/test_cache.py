@@ -84,7 +84,6 @@ def test_cache_aggressive(proxy, browser):
     Ensure the aggressive cache will cache all requests
     """
     # Clear previous cache records, if they exist
-    proxy.set_cache_mode(CacheModeEnum.OFF)
     proxy.set_cache_mode(CacheModeEnum.AGGRESSIVE)
 
     request1_content = str(uuid4())
@@ -111,3 +110,46 @@ def test_cache_aggressive(proxy, browser):
 
         page.goto(f"{mock_url}/test")
         assert BeautifulSoup(page.content()).text.strip() == request1_content
+
+def test_cache_aggressive_get(proxy, browser):
+    """
+    Ensure the aggressive cache will cache GET request but not POST requests
+    """
+    # Clear previous cache records, if they exist
+    proxy.set_cache_mode(CacheModeEnum.AGGRESSIVE_GET)
+
+    request1_content = str(uuid4())
+    request2_content = str(uuid4())
+    request3_content = str(uuid4())
+
+    with mock_server([
+        MockPageDefinition(
+            "/test",
+            content=f"<html><body>{request1_content}<form method='POST'><input type='submit' id='submit-button' /></form></body></html>"
+        ),
+        MockPageDefinition(
+            "/test",
+            content=f"<html><body>{request2_content}</body></html>"
+        ),
+        MockPageDefinition(
+            "/test",
+            content=f"<html><body>{request3_content}</body></html>",
+            method="post",
+        ),
+    ]) as mock_url:
+        context = browser.new_context(
+            proxy={
+                "server": proxy.base_url_proxy,
+            }
+        )
+        page = context.new_page()
+        page.goto(f"{mock_url}/test")
+        assert BeautifulSoup(page.content()).text.strip() == request1_content
+
+        # GET requests should cache
+        page.goto(f"{mock_url}/test")
+        assert BeautifulSoup(page.content()).text.strip() == request1_content
+
+        # But POST requests should not; issue via form submission
+        page.click("#submit-button")
+        assert BeautifulSoup(page.content()).text.strip() == request3_content
