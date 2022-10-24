@@ -6,7 +6,7 @@ from groove.proxy import CacheModeEnum
 from groove.tests.mock_server import MockPageDefinition, mock_server
 
 
-def test_cache_off(proxy, browser):
+def test_cache_off(proxy, context):
     """
     Ensure the cache is off will route all requests
     """
@@ -27,11 +27,6 @@ def test_cache_off(proxy, browser):
             content=f"<html><body>{request2_content}</body></html>"
         ),
     ]) as mock_url:
-        context = browser.new_context(
-            proxy={
-                "server": proxy.base_url_proxy,
-            }
-        )
         page = context.new_page()
         page.goto(f"{mock_url}/test")
         assert BeautifulSoup(page.content()).text.strip() == request1_content
@@ -40,7 +35,7 @@ def test_cache_off(proxy, browser):
         assert BeautifulSoup(page.content()).text.strip() == request2_content
 
 
-def test_cache_standard(proxy, browser):
+def test_cache_standard(proxy, context):
     """
     Ensure the cache respects server headers
     """
@@ -65,11 +60,6 @@ def test_cache_standard(proxy, browser):
             }
         ),
     ]) as mock_url:
-        context = browser.new_context(
-            proxy={
-                "server": proxy.base_url_proxy,
-            }
-        )
         page = context.new_page()
         page.goto(f"{mock_url}/test")
         assert BeautifulSoup(page.content()).text.strip() == request1_content
@@ -79,7 +69,7 @@ def test_cache_standard(proxy, browser):
         assert BeautifulSoup(page.content()).text.strip() == request1_content
 
 
-def test_cache_aggressive(proxy, browser):
+def test_cache_aggressive(proxy, context):
     """
     Ensure the aggressive cache will cache all requests
     """
@@ -99,11 +89,6 @@ def test_cache_aggressive(proxy, browser):
             content=f"<html><body>{request2_content}</body></html>"
         ),
     ]) as mock_url:
-        context = browser.new_context(
-            proxy={
-                "server": proxy.base_url_proxy,
-            }
-        )
         page = context.new_page()
         page.goto(f"{mock_url}/test")
         assert BeautifulSoup(page.content()).text.strip() == request1_content
@@ -111,7 +96,7 @@ def test_cache_aggressive(proxy, browser):
         page.goto(f"{mock_url}/test")
         assert BeautifulSoup(page.content()).text.strip() == request1_content
 
-def test_cache_aggressive_get(proxy, browser):
+def test_cache_aggressive_get(proxy, context):
     """
     Ensure the aggressive cache will cache GET request but not POST requests
     """
@@ -137,11 +122,6 @@ def test_cache_aggressive_get(proxy, browser):
             method="post",
         ),
     ]) as mock_url:
-        context = browser.new_context(
-            proxy={
-                "server": proxy.base_url_proxy,
-            }
-        )
         page = context.new_page()
         page.goto(f"{mock_url}/test")
         assert BeautifulSoup(page.content()).text.strip() == request1_content

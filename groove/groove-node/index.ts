@@ -150,12 +150,17 @@ export class Groove {
         await checkStatus(response, "Failed to start recording.");
     }
 
-    async tapeGet() : Promise<TapeSession> {
+    async tapeGet(tapeID?: string) : Promise<TapeSession> {
+        tapeID = tapeID || "";
+
         const response = await fetchWithTimeout(
             `${this.baseUrlControl}/api/tape/retrieve`,
             {
                 method: "POST",
                 timeout: this.commandTimeout,
+                body: JSON.stringify({
+                    tapeID,
+                }),
             }
         )
         const contents = response.body;
