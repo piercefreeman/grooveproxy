@@ -9,6 +9,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type TapeRequest struct {
+	TapeID string `tapeID:"mode"`
+}
+
 type CacheModeRequest struct {
 	Mode int `json:"mode"`
 }
@@ -51,7 +55,18 @@ func createController(recorder *Recorder, cache *Cache, dialerSession *DialerSes
 	})
 
 	router.POST("/api/tape/retrieve", func(c *gin.Context) {
-		response, err := recorder.ExportData()
+		var request TapeRequest
+		err := json.NewDecoder(c.Request.Body).Decode(&request)
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"error":   err,
+			})
+			return
+		}
+
+		response, err := recorder.ExportData(request.TapeID)
 		if err != nil {
 			c.Status(http.StatusServiceUnavailable)
 			return

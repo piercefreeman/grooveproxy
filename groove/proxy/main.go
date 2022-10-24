@@ -111,6 +111,7 @@ func main() {
 		log.Printf("Server starting up! - configured to listen on http interface %d", *port)
 	}
 
+	setupHeadersMiddleware(proxy)
 	setupRecorderMiddleware(proxy, recorder)
 	setupCacheMiddleware(proxy, cache, recorder)
 

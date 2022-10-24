@@ -24,23 +24,12 @@ func filterSlice[T any](s []T, f func(T) bool) []T {
 	return filtered
 }
 
-func containsInt(s []int, search int) bool {
-	for _, value := range s {
-		if value == search {
+func contains[T comparable](s []T, e T) bool {
+	for _, v := range s {
+		if v == e {
 			return true
 		}
 	}
-
-	return false
-}
-
-func containsString(s []string, search string) bool {
-	for _, value := range s {
-		if value == search {
-			return true
-		}
-	}
-
 	return false
 }
 
