@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"encoding/gob"
 	"fmt"
 	"log"
 	"net/http"
@@ -11,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/peterbourgon/diskv/v3"
 	goproxy "github.com/piercefreeman/goproxy"
 	"github.com/pquerna/cachecontrol"
 )
@@ -45,35 +42,12 @@ type CacheEntry struct {
 	Error             string
 }
 
-func (cacheEntry *CacheEntry) toBytes() ([]byte, error) {
-	var writeBuffer bytes.Buffer
-	encoder := gob.NewEncoder(&writeBuffer)
-	err := encoder.Encode(cacheEntry)
-	if err != nil {
-		log.Println(fmt.Errorf("Failed to encode cache entry %w", err))
-		return nil, err
-	}
-
-	return writeBuffer.Bytes(), nil
-}
-
-func cacheEntryFromBytes(readBuffer []byte) (*CacheEntry, error) {
-	decoder := gob.NewDecoder(bytes.NewReader(readBuffer))
-	var cacheEntry CacheEntry
-	err := decoder.Decode(&cacheEntry)
-	if err != nil {
-		log.Println(fmt.Errorf("Failed to decode cache entry %w", err))
-		return nil, err
-	}
-	return &cacheEntry, nil
-}
-
 type Cache struct {
 	mode int // CacheModeOff | CacheModeStandard | CacheModeAggressive
 
 	// Disk cache comes bundled with a RWMutex so we can call functions directly
 	// and the lock will be handled internally
-	cacheDiskCache *diskv.Diskv
+	cacheDiskCache *CacheInvalidator
 
 	inflightRequests map[string]*sync.Mutex
 	lockGeneration   *sync.Mutex
@@ -81,20 +55,6 @@ type Cache struct {
 	// Current locks that are blocking on gaining exclusive access to their lock
 	blockingLocks      map[string]int
 	blockingLocksMutex *sync.RWMutex
-}
-
-const transformBlockSize = 2 // Grouping of chars per directory depth
-
-func blockTransform(s string) []string {
-	var (
-		sliceSize = len(s) / transformBlockSize
-		pathSlice = make([]string, sliceSize)
-	)
-	for i := 0; i < sliceSize; i++ {
-		from, to := i*transformBlockSize, (i*transformBlockSize)+transformBlockSize
-		pathSlice[i] = s[from:to]
-	}
-	return pathSlice
 }
 
 func NewCache(cacheSizeMaxMB uint64) *Cache {
@@ -108,15 +68,9 @@ func NewCache(cacheSizeMaxMB uint64) *Cache {
 	// We therefore append a fresh cache directory to their path to ensure no file condicts
 	cachePath := path.Join(user.HomeDir, ".grooveproxy/cache")
 
-	diskCache := diskv.New(diskv.Options{
-		BasePath:     cachePath,
-		Transform:    blockTransform,
-		CacheSizeMax: 1024 * 1024 * cacheSizeMaxMB,
-	})
-
 	return &Cache{
 		mode:               CacheModeStandard,
-		cacheDiskCache:     diskCache,
+		cacheDiskCache:     NewCacheInvalidator(cachePath, 20, 500, 10),
 		inflightRequests:   map[string]*sync.Mutex{},
 		lockGeneration:     &sync.Mutex{},
 		blockingLocks:      make(map[string]int),
@@ -147,12 +101,10 @@ func (c *Cache) SetValidCacheContents(request *http.Request, response *http.Resp
 			CacheInvalidation: expires,
 			Value:             responseToArchivedResponse(response),
 		}
-		encodedEntry, err := cacheEntry.toBytes()
+		err := c.cacheDiskCache.Set(getCacheKey(request), cacheEntry)
 		if err != nil {
-			return
+			log.Printf("Failed to set cache entry for key: %s", request.URL.String())
 		}
-
-		c.cacheDiskCache.Write(getCacheKey(request), encodedEntry)
 	}
 }
 
@@ -174,12 +126,10 @@ func (c *Cache) SetFailedCacheContents(request *http.Request, err error) {
 		Value:             nil,
 		Error:             err.Error(),
 	}
-	encodedEntry, err := cacheEntry.toBytes()
+	err = c.cacheDiskCache.Set(getCacheKey(request), cacheEntry)
 	if err != nil {
-		return
+		log.Printf("Failed to set cache entry for key: %s", request.URL.String())
 	}
-
-	c.cacheDiskCache.Write(getCacheKey(request), encodedEntry)
 }
 
 func (c *Cache) GetCacheContents(request *http.Request) *CacheEntry {
@@ -194,23 +144,18 @@ func (c *Cache) GetCacheContents(request *http.Request) *CacheEntry {
 		return nil
 	}
 
-	cacheRaw, err := c.cacheDiskCache.Read(requestKey)
+	var cache CacheEntry
+	err := c.cacheDiskCache.Get(requestKey, &cache)
 
 	if err != nil {
 		log.Printf("Failed to read cache entry for key: %s (%s)", request.URL.String(), requestKey)
 		return nil
 	}
 
-	cache, err := cacheEntryFromBytes(cacheRaw)
-	if err != nil {
-		log.Printf("Failed to decode cache entry for key: %s (%s)", request.URL.String(), requestKey)
-		return nil
-	}
-
 	// Determine if the cache is still valid
-	if c.cacheEntryValid(cache) {
+	if c.cacheEntryValid(&cache) {
 		log.Printf("Return cache value: %s (%s)", request.URL.String(), requestKey)
-		return cache
+		return &cache
 	}
 
 	log.Printf("Cache miss: %s (%s)", request.URL.String(), requestKey)
@@ -296,7 +241,7 @@ func (c *Cache) ReleaseRequestLock(url string) {
 
 func (c *Cache) Clear() {
 	// Will erase everything from the given disk
-	c.cacheDiskCache.EraseAll()
+	c.cacheDiskCache.Clear()
 }
 
 func (c *Cache) cacheEntryValid(cacheEntry *CacheEntry) bool {
