@@ -93,9 +93,13 @@ func createController(recorder *Recorder, cache *Cache, dialerSession *DialerSes
 		cache.mode = request.Mode
 		log.Printf("Cache mode set: %d\n", cache.mode)
 
-		if cache.mode == CacheModeOff {
-			cache.Clear()
-		}
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+		})
+	})
+
+	router.POST("/api/cache/delete", func(c *gin.Context) {
+		cache.Clear()
 
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,
