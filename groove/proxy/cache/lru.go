@@ -1,6 +1,9 @@
 package cache
 
-import "container/list"
+import (
+	"container/list"
+	"sync"
+)
 
 type CacheMetadata struct {
 	/*
@@ -20,6 +23,7 @@ type LRUCache struct {
 	// Linked-list, where freshest cache items are at the front and oldest (and closest to invalidation)
 	// are at the end.
 	// Instances of CacheMetadata
+	linkedListLock   *sync.RWMutex
 	orderedCacheKeys *list.List
 	keyToElement     map[string]*list.Element
 
@@ -47,14 +51,19 @@ func NewLRUCache(backingCache any, currentSize int64, maxSize int64) *LRUCache {
 		keyToElement:     make(map[string]*list.Element),
 		currentSize:      currentSize,
 		maxSize:          maxSize,
+		linkedListLock:   &sync.RWMutex{},
 	}
 }
 
 func (cache *LRUCache) Get(key string) (*[]byte, error) {
 	// If so, move it to the front of the list
+	cache.linkedListLock.RLock()
 	metadata, ok := cache.keyToElement[key]
+	cache.linkedListLock.RUnlock()
 	if ok {
+		cache.linkedListLock.Lock()
 		cache.orderedCacheKeys.MoveToFront(metadata)
+		cache.linkedListLock.Unlock()
 	}
 
 	return cache.GetValueCallback(cache, key)
@@ -77,6 +86,7 @@ func (cache *LRUCache) Set(key string, value *[]byte) error {
 	// Check if either the memory or disk cache would become full with this object and purge accordingly
 	// Purge the oldest entries until we have enough space
 	if cache.maxSize > -1 {
+		cache.linkedListLock.Lock()
 		for cache.currentSize+metadata.Size > cache.maxSize {
 			oldestElement := cache.orderedCacheKeys.Back()
 			if oldestElement == nil {
@@ -85,6 +95,7 @@ func (cache *LRUCache) Set(key string, value *[]byte) error {
 			oldestKey := oldestElement.Value.(CacheMetadata).Key
 			cache.Delete(oldestKey)
 		}
+		cache.linkedListLock.Unlock()
 	}
 
 	// It's possible we would still exhaust the memory space, in which case we shouldn't
@@ -95,7 +106,9 @@ func (cache *LRUCache) Set(key string, value *[]byte) error {
 			return err
 		}
 		cache.currentSize += metadata.Size
+		cache.linkedListLock.Lock()
 		cache.keyToElement[key] = cache.orderedCacheKeys.PushFront(metadata)
+		cache.linkedListLock.Unlock()
 	}
 
 	return nil
@@ -107,11 +120,15 @@ func (cache *LRUCache) Has(key string) bool {
 
 func (cache *LRUCache) Delete(key string) {
 	// Housekeeping for the metadata
+	cache.linkedListLock.RLock()
 	metadata, ok := cache.keyToElement[key]
+	cache.linkedListLock.RUnlock()
 	if ok {
+		cache.linkedListLock.Lock()
 		cache.orderedCacheKeys.Remove(metadata)
 		cache.currentSize -= metadata.Value.(CacheMetadata).Size
 		delete(cache.keyToElement, key)
+		cache.linkedListLock.Unlock()
 	}
 
 	// Perform the actual deletion
@@ -119,5 +136,11 @@ func (cache *LRUCache) Delete(key string) {
 }
 
 func (cache *LRUCache) DeleteAll() {
+	cache.linkedListLock.Lock()
+	cache.orderedCacheKeys = nil
+	cache.currentSize = 0
+	cache.keyToElement = nil
+	cache.linkedListLock.Unlock()
+
 	cache.DeleteAllCallback(cache)
 }

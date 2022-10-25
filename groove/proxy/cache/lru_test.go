@@ -42,6 +42,44 @@ func TestCacheStorage(t *testing.T) {
 	}
 }
 
+func TestCacheStorageRace(t *testing.T) {
+	/*
+	 * Race condition for cache storage
+	 */
+	invalidator := &CacheInvalidator{}
+
+	cacheDirectory, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatalf("Error creating temp dir: %s", err)
+	}
+
+	var tests = []struct {
+		lruCache *LRUCache
+		label    string
+		spawns   int
+	}{
+		{invalidator.buildMemoryCache(1), "memory", 100},
+		{invalidator.buildDiskCache(1, cacheDirectory), "disk", 100},
+	}
+
+	// Explicitly try to create conflicts on one key
+	testKey := "testKey"
+
+	for _, test := range tests {
+		log.Printf("TestCacheStorage: Testing cache: %s", test.label)
+
+		for i := 0; i < test.spawns; i++ {
+			log.Printf("Spawning: %d", i)
+			// Create a new object for each spawn since we pass a pointer
+			testObject := []byte{97}
+			go func() {
+				test.lruCache.Set(testKey, &testObject)
+				test.lruCache.Get(testKey)
+			}()
+		}
+	}
+}
+
 func TestInvalidateCache(t *testing.T) {
 	invalidator := &CacheInvalidator{}
 
