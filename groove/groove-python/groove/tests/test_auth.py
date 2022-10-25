@@ -47,7 +47,7 @@ def test_auth_requests():
             verify=get_asset_path("ssl/ca.crt"),
         )
         assert response.ok
-        assert BeautifulSoup(response.content).strip() == "Test content"
+        assert BeautifulSoup(response.content, features="html.parser").strip() == "Test content"
 
 
 @pytest.mark.xfail()
@@ -88,4 +88,4 @@ def test_auth_chromium(browser):
         )
         page = context.new_page()
         page.goto("https://freeman.vc", timeout=5000)
-        assert BeautifulSoup(page.content()).text.strip() == "Test content"
+        assert BeautifulSoup(page.content(), features="html.parser").text.strip() == "Test content"

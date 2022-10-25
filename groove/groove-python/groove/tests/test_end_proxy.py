@@ -88,7 +88,7 @@ def test_end_proxy(end_proxy, middle_proxy, browser):
             )
             page = context.new_page()
             page.goto("https://freeman.vc", timeout=5000)
-            assert BeautifulSoup(page.content()).text.strip() == "Test content"
+            assert BeautifulSoup(page.content(), features="html.parser").text.strip() == "Test content"
 
             # Make sure the middle proxy routes through the end proxy correctly
             context = browser.new_context(
@@ -98,4 +98,4 @@ def test_end_proxy(end_proxy, middle_proxy, browser):
             )
             page = context.new_page()
             page.goto("https://freeman.vc", timeout=5000)
-            assert BeautifulSoup(page.content()).text.strip() == "Test content"
+            assert BeautifulSoup(page.content(), features="html.parser").text.strip() == "Test content"

@@ -58,8 +58,8 @@ func TestCacheStorageRace(t *testing.T) {
 		label    string
 		spawns   int
 	}{
-		{invalidator.buildMemoryCache(1), "memory", 100},
-		{invalidator.buildDiskCache(1, cacheDirectory), "disk", 100},
+		{invalidator.buildMemoryCache(1), "memory", 10},
+		{invalidator.buildDiskCache(1, cacheDirectory), "disk", 10},
 	}
 
 	// Explicitly try to create conflicts on one key
