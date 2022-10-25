@@ -202,3 +202,7 @@ jobs:
       - name: Run test
         run:
           docker run ${{ env.IMAGE }}:groove-${{ github.sha }} test-go
+
+      - name: Run race condition tests
+        run:
+          docker run ${{ env.IMAGE }}:groove-${{ github.sha }} race-go

@@ -10,15 +10,18 @@ import (
 )
 
 type OptimizedCertStore struct {
-	certs map[string]*tls.Certificate
-	locks map[string]*sync.Mutex
+	certs    map[string]*tls.Certificate
+	locks    map[string]*sync.Mutex
+	certLock *sync.RWMutex
+
 	sync.Mutex
 }
 
 func NewOptimizedCertStore() *OptimizedCertStore {
 	return &OptimizedCertStore{
-		certs: map[string]*tls.Certificate{},
-		locks: map[string]*sync.Mutex{},
+		certs:    map[string]*tls.Certificate{},
+		locks:    map[string]*sync.Mutex{},
+		certLock: &sync.RWMutex{},
 	}
 }
 
@@ -29,7 +32,9 @@ func (s *OptimizedCertStore) Fetch(host string, genCert func() (*tls.Certificate
 	hostLock.Lock()
 	defer hostLock.Unlock()
 
+	s.certLock.RLock()
 	cert, ok := s.certs[host]
+	s.certLock.RUnlock()
 	var err error
 	if !ok {
 		fmt.Printf("cache miss: %s\n", host)
@@ -38,7 +43,9 @@ func (s *OptimizedCertStore) Fetch(host string, genCert func() (*tls.Certificate
 		if err != nil {
 			return nil, err
 		}
+		s.certLock.Lock()
 		s.certs[host] = cert
+		s.certLock.Unlock()
 	} else {
 		fmt.Printf("cache hit: %s\n", host)
 	}

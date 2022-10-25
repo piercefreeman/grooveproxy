@@ -45,7 +45,7 @@ def test_tape_global(proxy, browser):
     page = context.new_page()
     page.goto("https://freeman.vc")
 
-    assert BeautifulSoup(page.content()).text.strip() == "Mocked content"
+    assert BeautifulSoup(page.content(), features="html.parser").text.strip() == "Mocked content"
 
 
 def test_tape_id(proxy, session):
@@ -111,7 +111,7 @@ def test_multiple_requests(proxy, context):
     page = context.new_page()
 
     page.goto("https://freeman.vc")
-    assert BeautifulSoup(page.content()).text.strip() == response_1
+    assert BeautifulSoup(page.content(), features="html.parser").text.strip() == response_1
 
     page.goto("https://freeman.vc")
-    assert BeautifulSoup(page.content()).text.strip() == response_2
+    assert BeautifulSoup(page.content(), features="html.parser").text.strip() == response_2

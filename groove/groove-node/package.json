@@ -1,23 +1,26 @@
 {
   "name": "@piercefreeman/groove",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "build/cjs/index.js",
+  "module": "build/esm/index.js",
+  "types": "build/src/index.d.ts",
   "directories": {
-    "test": "tests"
+    "test": "__tests__"
   },
   "scripts": {
     "prepublish": "tsc",
     "postinstall": "./lifecycle/install.sh",
     "preuninstall": "./lifecycle/uninstall.sh",
-    "build": "tsc",
+    "build": "npm run type:dts && npm run build:main",
+    "build:main": "node -r ./esbuild-hook ./scripts/build",
+    "type:dts": "tsc --emitDeclarationOnly",
     "lint": "eslint .",
     "prepare": "npm run build",
     "test": "jest ."
   },
   "bin": {
-    "install-ca": "dist/install-ca.js"
+    "install-ca": "build/cjs/install-ca.js"
   },
   "author": "",
   "license": "MIT",
@@ -34,6 +37,7 @@
   },
   "dependencies": {
     "@types/node-fetch": "^2.6.2",
+    "esbuild": "^0.15.12",
     "form-data": "^4.0.0",
     "https-proxy-agent": "^5.0.1",
     "node-fetch": "^2.6.7"

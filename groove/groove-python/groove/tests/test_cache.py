@@ -29,10 +29,10 @@ def test_cache_off(proxy, context):
     ]) as mock_url:
         page = context.new_page()
         page.goto(f"{mock_url}/test")
-        assert BeautifulSoup(page.content()).text.strip() == request1_content
+        assert BeautifulSoup(page.content(), features="html.parser").text.strip() == request1_content
 
         page.goto(f"{mock_url}/test")
-        assert BeautifulSoup(page.content()).text.strip() == request2_content
+        assert BeautifulSoup(page.content(), features="html.parser").text.strip() == request2_content
 
 
 def test_cache_standard(proxy, context):
@@ -62,11 +62,11 @@ def test_cache_standard(proxy, context):
     ]) as mock_url:
         page = context.new_page()
         page.goto(f"{mock_url}/test")
-        assert BeautifulSoup(page.content()).text.strip() == request1_content
+        assert BeautifulSoup(page.content(), features="html.parser").text.strip() == request1_content
 
         # We should never hit the second definition because of the first requests' headers
         page.goto(f"{mock_url}/test")
-        assert BeautifulSoup(page.content()).text.strip() == request1_content
+        assert BeautifulSoup(page.content(), features="html.parser").text.strip() == request1_content
 
 
 def test_cache_aggressive(proxy, context):
@@ -91,10 +91,10 @@ def test_cache_aggressive(proxy, context):
     ]) as mock_url:
         page = context.new_page()
         page.goto(f"{mock_url}/test")
-        assert BeautifulSoup(page.content()).text.strip() == request1_content
+        assert BeautifulSoup(page.content(), features="html.parser").text.strip() == request1_content
 
         page.goto(f"{mock_url}/test")
-        assert BeautifulSoup(page.content()).text.strip() == request1_content
+        assert BeautifulSoup(page.content(), features="html.parser").text.strip() == request1_content
 
 def test_cache_aggressive_get(proxy, context):
     """
@@ -124,12 +124,12 @@ def test_cache_aggressive_get(proxy, context):
     ]) as mock_url:
         page = context.new_page()
         page.goto(f"{mock_url}/test")
-        assert BeautifulSoup(page.content()).text.strip() == request1_content
+        assert BeautifulSoup(page.content(), features="html.parser").text.strip() == request1_content
 
         # GET requests should cache
         page.goto(f"{mock_url}/test")
-        assert BeautifulSoup(page.content()).text.strip() == request1_content
+        assert BeautifulSoup(page.content(), features="html.parser").text.strip() == request1_content
 
         # But POST requests should not; issue via form submission
         page.click("#submit-button")
-        assert BeautifulSoup(page.content()).text.strip() == request3_content
+        assert BeautifulSoup(page.content(), features="html.parser").text.strip() == request3_content

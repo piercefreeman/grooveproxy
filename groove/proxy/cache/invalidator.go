@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -62,6 +63,7 @@ func NewCacheInvalidator(
 		saveInterval:    saveInterval,
 		saveWaiter:      &sync.WaitGroup{},
 	}
+	log.Printf("Cache path: %s", invalidator.indexPath)
 
 	invalidator.diskCache = invalidator.buildDiskCache(1024*1024*maxDiskSizeMB, diskCacheLocation)
 	invalidator.memoryCache = invalidator.buildMemoryCache(1024 * 1024 * maxMemorySizeMB)
@@ -71,10 +73,11 @@ func NewCacheInvalidator(
 
 func (cache *CacheInvalidator) buildMemoryCache(maxMemorySize int64) *LRUCache {
 	memoryCache := NewLRUCache(make(MemoryCache), 0, maxMemorySize)
-	memoryCache.SetValueCallback = func(lru *LRUCache, key string, value *[]byte) {
+	memoryCache.SetValueCallback = func(lru *LRUCache, key string, value *[]byte) error {
 		cache.memoryCacheLock.Lock()
 		lru.backingCache.(MemoryCache)[key] = value
 		cache.memoryCacheLock.Unlock()
+		return nil
 	}
 	memoryCache.GetValueCallback = func(lru *LRUCache, key string) (*[]byte, error) {
 		cache.memoryCacheLock.RLock()
@@ -92,7 +95,9 @@ func (cache *CacheInvalidator) buildMemoryCache(maxMemorySize int64) *LRUCache {
 		return ok
 	}
 	memoryCache.DeleteKeyCallback = func(lru *LRUCache, key string) {
+		cache.memoryCacheLock.Lock()
 		delete(lru.backingCache.(MemoryCache), key)
+		cache.memoryCacheLock.Unlock()
 	}
 	memoryCache.DeleteAllCallback = func(lru *LRUCache) {
 		lru.backingCache = make(MemoryCache)
@@ -113,8 +118,8 @@ func (cache *CacheInvalidator) buildDiskCache(maxDiskSize int64, diskCacheLocati
 		totalDiskSize,
 		maxDiskSize,
 	)
-	diskCache.SetValueCallback = func(lru *LRUCache, key string, value *[]byte) {
-		lru.backingCache.(*diskv.Diskv).Write(key, *value)
+	diskCache.SetValueCallback = func(lru *LRUCache, key string, value *[]byte) error {
+		return lru.backingCache.(*diskv.Diskv).Write(key, *value)
 	}
 	diskCache.GetValueCallback = func(lru *LRUCache, key string) (value *[]byte, err error) {
 		encodedValue, err := lru.backingCache.(*diskv.Diskv).Read(key)
@@ -137,24 +142,33 @@ func (cache *CacheInvalidator) buildDiskCache(maxDiskSize int64, diskCacheLocati
 	// Load in the saved metadatas - the index file stores these as we intend; most recently
 	// accessed should be first
 	for _, metadata := range diskMetadata {
-		diskCache.orderedCacheKeys.PushBack(metadata.Key)
+		element := diskCache.orderedCacheKeys.PushBack(*metadata)
+		diskCache.keyToElement[metadata.Key] = element
 	}
 
 	return diskCache
 }
 
-func (cache *CacheInvalidator) Get(key string, obj any) error {
-	encodedValue, err := cache.memoryCache.Get(key)
-	if err != nil {
-		return err
+func (cache *CacheInvalidator) Get(key string, obj any) (err error) {
+	var encodedValue *[]byte
+	if cache.memoryCache.Has(key) {
+		encodedValue, err = cache.memoryCache.Get(key)
+		if err != nil {
+			return err
+		}
 	}
-	encodedValue, err = cache.diskCache.Get(key)
-	if err != nil {
-		return err
+	if cache.diskCache.Has(key) {
+		encodedValue, err = cache.diskCache.Get(key)
+		if err != nil {
+			return err
+		}
 	}
 
-	objectFromBytes(*encodedValue, obj)
-	return nil
+	if encodedValue == nil {
+		return fmt.Errorf("Key %s not found in cache", key)
+	}
+
+	return objectFromBytes(*encodedValue, obj)
 }
 
 func (cache *CacheInvalidator) Set(key string, value any) error {
