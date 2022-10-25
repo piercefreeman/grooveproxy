@@ -93,24 +93,34 @@ func (cache *LRUCache) Set(key string, value *[]byte) error {
 				break
 			}
 			oldestKey := oldestElement.Value.(CacheMetadata).Key
-			cache.Delete(oldestKey)
+			// We already hold an exclusive lock and don't want to try and re-aquire
+			cache.deleteWithProtection(oldestKey, false)
 		}
 		cache.linkedListLock.Unlock()
 	}
 
 	// It's possible we would still exhaust the memory space, in which case we shouldn't
 	// store it at all. Ensure we stay under the threshold.
-	if cache.currentSize+metadata.Size <= cache.maxSize {
-		err := cache.SetValueCallback(cache, key, value)
-		if err != nil {
-			return err
-		}
-		cache.currentSize += metadata.Size
-		cache.linkedListLock.Lock()
-		cache.keyToElement[key] = cache.orderedCacheKeys.PushFront(metadata)
-		cache.linkedListLock.Unlock()
+	// We wrap this in a full lock as well since once we verify that we have the space overhead
+	// we want to be the process that writes to it
+	if hasSpace := cache.allocateSpace(&metadata); !hasSpace {
+		return nil
 	}
 
+	// Determine if we were able to successfully save the value in the store
+	// We only want to retain the metadata if it succeeded
+	err := cache.SetValueCallback(cache, key, value)
+
+	// The next size/list manipulations we need to do under lock
+	cache.linkedListLock.Lock()
+	defer cache.linkedListLock.Unlock()
+
+	if err != nil {
+		cache.currentSize -= metadata.Size
+		return err
+	}
+
+	cache.keyToElement[key] = cache.orderedCacheKeys.PushFront(metadata)
 	return nil
 }
 
@@ -119,15 +129,36 @@ func (cache *LRUCache) Has(key string) bool {
 }
 
 func (cache *LRUCache) Delete(key string) {
-	// Housekeeping for the metadata
-	cache.linkedListLock.RLock()
-	metadata, ok := cache.keyToElement[key]
-	cache.linkedListLock.RUnlock()
-	if ok {
+	cache.deleteWithProtection(key, true)
+}
+
+func (cache *LRUCache) DeleteAll() {
+	cache.linkedListLock.Lock()
+	cache.orderedCacheKeys = list.New()
+	cache.currentSize = 0
+	cache.keyToElement = make(map[string]*list.Element)
+	cache.linkedListLock.Unlock()
+
+	cache.DeleteAllCallback(cache)
+}
+
+func (cache *LRUCache) deleteWithProtection(key string, protected bool) {
+	// We want the entire delete block to be protected because we are manipulating
+	// the linked list and want to find the key, hold exclusive access to it, and
+	// then delete it
+	if protected {
 		cache.linkedListLock.Lock()
+	}
+
+	// Housekeeping for the metadata
+	metadata, ok := cache.keyToElement[key]
+	if ok {
 		cache.orderedCacheKeys.Remove(metadata)
 		cache.currentSize -= metadata.Value.(CacheMetadata).Size
 		delete(cache.keyToElement, key)
+	}
+
+	if protected {
 		cache.linkedListLock.Unlock()
 	}
 
@@ -135,12 +166,17 @@ func (cache *LRUCache) Delete(key string) {
 	cache.DeleteKeyCallback(cache, key)
 }
 
-func (cache *LRUCache) DeleteAll() {
+func (cache *LRUCache) allocateSpace(metadata *CacheMetadata) bool {
+	/*
+	 * Determine if we have enough space to allocate a new metadata in the cache
+	 * If so, increment the space
+	 */
 	cache.linkedListLock.Lock()
-	cache.orderedCacheKeys = nil
-	cache.currentSize = 0
-	cache.keyToElement = nil
-	cache.linkedListLock.Unlock()
+	defer cache.linkedListLock.Unlock()
 
-	cache.DeleteAllCallback(cache)
+	hasSpace := cache.currentSize+metadata.Size <= cache.maxSize
+	if hasSpace {
+		cache.currentSize += metadata.Size
+	}
+	return hasSpace
 }

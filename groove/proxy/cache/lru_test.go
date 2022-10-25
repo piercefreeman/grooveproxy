@@ -58,8 +58,8 @@ func TestCacheStorageRace(t *testing.T) {
 		label    string
 		spawns   int
 	}{
-		{invalidator.buildMemoryCache(1), "memory", 10},
-		{invalidator.buildDiskCache(1, cacheDirectory), "disk", 10},
+		{invalidator.buildMemoryCache(1), "memory", 500},
+		{invalidator.buildDiskCache(1, cacheDirectory), "disk", 500},
 	}
 
 	// Explicitly try to create conflicts on one key
@@ -71,11 +71,11 @@ func TestCacheStorageRace(t *testing.T) {
 		for i := 0; i < test.spawns; i++ {
 			log.Printf("Spawning: %d", i)
 			// Create a new object for each spawn since we pass a pointer
-			testObject := []byte{97}
-			go func() {
-				test.lruCache.Set(testKey, &testObject)
-				test.lruCache.Get(testKey)
-			}()
+			go func(lruCache *LRUCache) {
+				testObject := []byte{97}
+				lruCache.Set(testKey, &testObject)
+				lruCache.Get(testKey)
+			}(test.lruCache)
 		}
 	}
 }
