@@ -19,3 +19,6 @@ cp $rootDirectory/build/grooveproxy $rootDirectory/groove-python/groove/assets/g
 
 # Manual Node install
 cp $rootDirectory/build/grooveproxy $rootDirectory/groove-node/node_modules/.bin/grooveproxy
+
+# Node build
+(cd $rootDirectory/groove-node && npm run build)

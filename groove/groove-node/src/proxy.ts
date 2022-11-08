@@ -1,6 +1,6 @@
 import { promisify } from 'util';
 import { exec, spawn } from 'child_process';
-import { stat } from 'fs/promises';
+import { stat, realpath } from 'fs/promises';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { fetchWithTimeout, sleep, streamToBuffer } from './utilities';
@@ -95,6 +95,7 @@ export class Groove {
         }
 
         const exc = await this.getExecutablePath()
+        console.log(`Will launch groove executable: ${exc}`)
         this.process = spawn(
             exc,
             Object.entries(parameters).reduce((previous: string[], [key, value] : [string, string | null]) => {    
@@ -280,6 +281,9 @@ export class Groove {
         }
         const binDirectory = npmBin.stdout.trim();
         this.executablePath = join(binDirectory, "grooveproxy");
+
+        // Resolve symbolic links
+        this.executablePath = await realpath(this.executablePath)
 
         // Determine if the path exists, will raise an error if not
         await stat(this.executablePath)
