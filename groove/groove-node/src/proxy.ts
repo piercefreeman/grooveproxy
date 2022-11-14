@@ -42,6 +42,23 @@ const checkStatus = async (response: any, echoError: string) => {
     }
 }
 
+export const getExecutable = async () => {
+    const npmBin = await promisify(exec)("npm bin");
+    if (npmBin.stderr || !npmBin.stdout) {
+        throw Error("Unknown grooveproxy executable location")
+    }
+    const binDirectory = npmBin.stdout.trim();
+    let executablePath = join(binDirectory, "grooveproxy");
+
+    // Resolve symbolic links
+    executablePath = await realpath(executablePath)
+
+    // Determine if the path exists, will raise an error if not
+    await stat(executablePath)
+
+    return executablePath
+}
+
 export class Groove {
     process: any
     executablePath: string | null
@@ -275,19 +292,7 @@ export class Groove {
     async getExecutablePath() {
         if (this.executablePath) return this.executablePath;
 
-        const npmBin = await promisify(exec)("npm bin");
-        if (npmBin.stderr || !npmBin.stdout) {
-            throw Error("Unknown grooveproxy executable location")
-        }
-        const binDirectory = npmBin.stdout.trim();
-        this.executablePath = join(binDirectory, "grooveproxy");
-
-        // Resolve symbolic links
-        this.executablePath = await realpath(this.executablePath)
-
-        // Determine if the path exists, will raise an error if not
-        await stat(this.executablePath)
-
-        return this.executablePath
+       this.executablePath = await getExecutable();
+       return this.executablePath;
     }
 }

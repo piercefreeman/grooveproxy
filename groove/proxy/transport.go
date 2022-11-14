@@ -113,7 +113,6 @@ func (rt *CustomRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 		// Iterate the dialer until we hit on the correct value
 		dialerDefinition := rt.dialerSession.NextDialer(dialerContext)
 		if dialerDefinition == nil {
-			log.Printf("Exhausted dialers - (tried: %d) (max allowed: %d)", len(rt.dialerSession.DialerDefinitions), rt.dialerSession.TotalTries)
 			return nil, fmt.Errorf("Exhausted dialers - (tried: %d) (max allowed: %d)", len(rt.dialerSession.DialerDefinitions), rt.dialerSession.TotalTries)
 		}
 
