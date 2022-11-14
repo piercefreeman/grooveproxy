@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -112,7 +113,7 @@ func (rt *CustomRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 		// Iterate the dialer until we hit on the correct value
 		dialerDefinition := rt.dialerSession.NextDialer(dialerContext)
 		if dialerDefinition == nil {
-			return nil, errors.New("Exhausted dialers")
+			return nil, fmt.Errorf("Exhausted dialers - (tried: %d) (max allowed: %d)", len(rt.dialerSession.DialerDefinitions), rt.dialerSession.TotalTries)
 		}
 
 		protocol, err := rt.solveProtocol(req, dialerDefinition)

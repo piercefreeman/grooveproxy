@@ -159,6 +159,8 @@ func createController(recorder *Recorder, cache *Cache, dialerSession *DialerSes
 		dialerSession.DialerDefinitions = nil
 
 		if len(requests.Definitions) == 0 {
+			log.Println("No dialer definitions provided, using default dialer.")
+
 			// If no requests are provided, default to passing through everything
 			// so we're guaranteed to have one valid dialer
 			dialerSession.DialerDefinitions = append(
@@ -166,6 +168,8 @@ func createController(recorder *Recorder, cache *Cache, dialerSession *DialerSes
 				NewDialerDefinition(0, nil, nil),
 			)
 		} else {
+			log.Println("Setting dialer definitions...")
+
 			for _, request := range requests.Definitions {
 				var requestRequires *RequestRequiresDefinition = nil
 				var proxy *ProxyDefinition = nil

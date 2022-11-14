@@ -1,6 +1,6 @@
 import { promisify } from 'util';
 import { exec, spawn } from 'child_process';
-import { stat } from 'fs/promises';
+import { stat, realpath } from 'fs/promises';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { fetchWithTimeout, sleep, streamToBuffer } from './utilities';
@@ -40,6 +40,23 @@ const checkStatus = async (response: any, echoError: string) => {
     if (contents["success"] != true) {
         throw Error(echoError)
     }
+}
+
+export const getExecutable = async () => {
+    const npmBin = await promisify(exec)("npm bin");
+    if (npmBin.stderr || !npmBin.stdout) {
+        throw Error("Unknown grooveproxy executable location")
+    }
+    const binDirectory = npmBin.stdout.trim();
+    let executablePath = join(binDirectory, "grooveproxy");
+
+    // Resolve symbolic links
+    executablePath = await realpath(executablePath)
+
+    // Determine if the path exists, will raise an error if not
+    await stat(executablePath)
+
+    return executablePath
 }
 
 export class Groove {
@@ -95,6 +112,7 @@ export class Groove {
         }
 
         const exc = await this.getExecutablePath()
+        console.log(`Will launch groove executable: ${exc}`)
         this.process = spawn(
             exc,
             Object.entries(parameters).reduce((previous: string[], [key, value] : [string, string | null]) => {    
@@ -274,16 +292,7 @@ export class Groove {
     async getExecutablePath() {
         if (this.executablePath) return this.executablePath;
 
-        const npmBin = await promisify(exec)("npm bin");
-        if (npmBin.stderr || !npmBin.stdout) {
-            throw Error("Unknown grooveproxy executable location")
-        }
-        const binDirectory = npmBin.stdout.trim();
-        this.executablePath = join(binDirectory, "grooveproxy");
-
-        // Determine if the path exists, will raise an error if not
-        await stat(this.executablePath)
-
-        return this.executablePath
+       this.executablePath = await getExecutable();
+       return this.executablePath;
     }
 }

@@ -1,12 +1,11 @@
 #!/usr/bin/env node
 
-import { Groove } from './index';
+import { getExecutable } from './index';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
 const main = async () => {
-    const proxy = new Groove({});
-    const executable = await proxy.getExecutablePath();
+    const executable = await getExecutable();
 
     try {
         await promisify(exec)(`${executable} install-ca`);
