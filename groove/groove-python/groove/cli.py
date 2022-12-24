@@ -4,7 +4,7 @@ from groove.assets import get_asset_path
 
 
 def install_ca():
-    run(
+    run([
         str(get_asset_path("grooveproxy")),
         "install-ca",
-    )
+    ])
